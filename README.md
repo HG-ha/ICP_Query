@@ -1,6 +1,25 @@
 # ICP_Query
 ICP备案查询，全异步构建的高性能ICP查询模块，支持Web、APP、小程序、快应用查询，支持根据备案号查询
 
+
+### 安装依赖
+``` shell
+    pip install -r requirements.txt
+```
+
+### 使用
+``` python
+    import asyncio
+    from ymicp import beian
+
+    async def main(name):
+        icp = beian()
+        query = await icp.ymApp(name)
+        print(query)
+
+    asyncio.run(main("微信"))
+```
+
 ### 请喝茶吗
 
 | 支付宝                                                                                     | 微信                                                                                    | 群                |
