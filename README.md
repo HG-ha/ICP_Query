@@ -4,6 +4,7 @@ ICP备案查询，基于Python3.8，全异步构建的高性能ICP查询模块�
 
 ### 安装依赖
 ``` shell
+# 可以使用低版本包，基本都包含需要的模块
 pip install -r requirements.txt
 ```
 
