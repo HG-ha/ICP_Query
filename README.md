@@ -4,20 +4,20 @@ ICP备案查询，全异步构建的高性能ICP查询模块，支持Web、APP�
 
 ### 安装依赖
 ``` shell
-    pip install -r requirements.txt
+pip install -r requirements.txt
 ```
 
 ### 使用
 ``` python
-    import asyncio
-    from ymicp import beian
+import asyncio
+from ymicp import beian
 
-    async def main(name):
-        icp = beian()
-        query = await icp.ymApp(name)
-        print(query)
+async def main(name):
+icp = beian()
+query = await icp.ymApp(name)
+print(query)
 
-    asyncio.run(main("微信"))
+asyncio.run(main("微信"))
 ```
 
 ### 请喝茶吗
