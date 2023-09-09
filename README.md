@@ -1,5 +1,5 @@
 # ICP_Query
-ICP备案查询，基于Python3.8，全异步构建的高性能ICP查询模块，直接从工业和信息化部政务服务平台抓取实时数据，支持Web、APP、小程序、快应用查询，支持根据备案号查询，同时提供简单易用的高性能Api
+ICP备案查询，基于Python3.8，全异步构建的高性能ICP查询模块，直接从工业和信息化部政务服务平台抓取实时数据，支持Web、APP、小程序、快应用名称查询，支持根据备案号查询，同时提供简单易用的高性能接口
 
 
 ### 安装依赖
@@ -28,11 +28,30 @@ asyncio.run(main("微信"))
 - APP: app
 - 小程序: mapp
 - 快应用: kapp
-#### Request
-- Method: **GET** **POST**
-- URL:  ```/query/{type}?search={name}```
-```
-```
+#### 请求
+1. GET
+    - URL: http://0.0.0.0:16181/query/{type}?search={name}
+    - 示例: 查询域名 baidu.com 备案信息
+    ```
+    curl http://127.0.0.1:16181/query/web?search=baidu.com
+    ```
+    - 示例: 根据网站的备案号 京ICP证030173号 查询备案信息
+    ```
+    curl http://127.0.0.1:16181/query/web?search=京ICP证030173号
+    ```
+2. POST
+   - headers : {"Content-Type": "application/json"}
+   - URL: http://0.0.0.0:16181/query/{type}
+   - Body: {"search":{name}}
+   - 示例: 查询域名 baidu.com 备案信息
+    ```
+    curl -X POST -H "Content-Type: application/json" -d '{"search":"baidu.com"}' http://127.0.0.1:16181/query/web
+    ```
+    - 示例: 根据网站的备案号 京ICP证030173号 查询备案信息
+    ```
+    curl -X POST -H "Content-Type: application/json" -d '{"search":"京ICP证030173号"}' http://127.0.0.1:16181/query/web
+    ```
+
 ##### Linux运行
 1. 源代码运行
 ``` shell
