@@ -43,7 +43,7 @@ asyncio.run(main("微信"))
 2. POST
    - headers : {"Content-Type": "application/json"}
    - URL: http://0.0.0.0:16181/query/{type}
-   - Body: {"search":{name}}
+   - Body: {"search": {name}}
    - 示例: 查询域名 baidu.com 备案信息
      
         ```
