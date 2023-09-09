@@ -31,40 +31,40 @@ asyncio.run(main("微信"))
 1. GET
     - URL: http://0.0.0.0:16181/query/{type}?search={name}
     - 示例: 查询域名 baidu.com 备案信息
-    ```
-    curl http://127.0.0.1:16181/query/web?search=baidu.com
-    ```
+        ```
+        curl http://127.0.0.1:16181/query/web?search=baidu.com
+        ```
     - 示例: 根据网站的备案号 京ICP证030173号 查询备案信息
-    ```
-    curl http://127.0.0.1:16181/query/web?search=京ICP证030173号
-    ```
+        ```
+        curl http://127.0.0.1:16181/query/web?search=京ICP证030173号
+        ```
 2. POST
    - headers : {"Content-Type": "application/json"}
    - URL: http://0.0.0.0:16181/query/{type}
    - Body: {"search":{name}}
    - 示例: 查询域名 baidu.com 备案信息
-    ```
-    curl -X POST -H "Content-Type: application/json" -d '{"search":"baidu.com"}' http://127.0.0.1:16181/query/web
-    ```
+        ```
+        curl -X POST -H "Content-Type: application/json" -d '{"search":"baidu.com"}' http://127.0.0.1:16181/query/web
+        ```
     - 示例: 根据网站的备案号 京ICP证030173号 查询备案信息
-    ```
-    curl -X POST -H "Content-Type: application/json" -d '{"search":"京ICP证030173号"}' http://127.0.0.1:16181/query/web
-    ```
+        ```
+        curl -X POST -H "Content-Type: application/json" -d '{"search":"京ICP证030173号"}' http://127.0.0.1:16181/query/web
+        ```
 
 ##### 3. Linux 运行icpApi
 1. 源代码运行
-``` shell
-python3 icpApi.py
-```
+    ``` shell
+    python3 icpApi.py
+    ```
 2. 独立程序运行
-``` shell
-./icpApi.bin
-```
+    ``` shell
+    ./icpApi.bin
+    ```
 ##### 4. Windows 运行icpApi
 1. 源代码运行
-``` cmd
-python3 icpApi.py
-```
+    ``` cmd
+    python3 icpApi.py
+    ```
 2. 独立程序直接双击运行
 
     
