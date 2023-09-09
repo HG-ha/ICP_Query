@@ -1,5 +1,5 @@
 # ICP_Query
-ICP备案查询，基于Python3.8，全异步构建的高性能ICP查询模块，直接从工业和信息化部政务服务平台抓取实时数据，支持Web、APP、小程序、快应用查询，支持根据备案号查询
+ICP备案查询，基于Python3.8，全异步构建的高性能ICP查询模块，直接从工业和信息化部政务服务平台抓取实时数据，支持Web、APP、小程序、快应用查询，支持根据备案号查询，同时提供简单易用的高性能Api
 
 
 ### 安装依赖
@@ -22,7 +22,18 @@ asyncio.run(main("微信"))
 ```
 
 ### 使用icpApi
-##### Linux
+#### 查询接口
+##### 支持四种类型查询：
+- 网站： web
+- APP: app
+- 小程序: mapp
+- 快应用: kapp
+#### Request
+- Method: **GET** **POST**
+- URL:  ```/query/{type}?search={name}```
+```
+```
+##### Linux运行
 1. 源代码运行
 ``` shell
 python3 icpApi.py
