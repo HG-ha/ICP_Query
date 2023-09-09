@@ -21,6 +21,18 @@ async def main(name):
 asyncio.run(main("微信"))
 ```
 
+### 使用icpApi
+##### Linux
+1. 源代码运行
+``` shell
+python3 icpApi.py
+```
+2. 独立程序运行
+``` shell
+./icpApi.bin
+```
+##### Windows
+1. 双击运行即可
 ### 请喝茶吗
 
 | 支付宝                                                                                     | 微信                                                                                    | 群                |
