@@ -74,6 +74,8 @@ asyncio.run(main("微信"))
     ```
 2. 独立程序直接双击运行
 
+##### 5. 直接使用在线API
+[API文档](http://api.wer.plus/inteface?id=6)
     
 ### 请喝茶吗
 
