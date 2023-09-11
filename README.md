@@ -99,7 +99,7 @@ asyncio.run(main("微信"))
 
 
 |  参数             |  说明                |
-<br>
+|  ----  | ----  |
 |  lastPage         |  据查询数量有多少页  |
 <br>
 |  pages            |  同lastPage          |
