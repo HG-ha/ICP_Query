@@ -115,7 +115,6 @@ asyncio.run(main("微信"))
 |  unitName         |  主办单位名称        |
 |  updateRecordTime |  审核通过日期        |
 |  contentTypeName  |  服务前置审批项      |
-|  CityId           |  城市ID              |
 
     
 ### 请喝茶吗
