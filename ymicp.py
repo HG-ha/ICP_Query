@@ -158,7 +158,12 @@ if __name__ == '__main__':
         a = beian()
         # 官方单页查询pageSize最大支持26
         # 页面索引pageNum从1开始,第一页可以不写
+        # 查询该公司的网站备案信息，每页10条数据，查询第二页
         data = await a.ymWeb("深圳市腾讯计算机系统有限公司",pageSize=10,pageNum=2)
+        print(data)
+        # 查询微信APP的备案信息
+        data = await a.ymApp("微信")
+        print(data)
         return data
     asyncio.run(main())
 
