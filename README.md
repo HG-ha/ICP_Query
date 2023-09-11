@@ -1,5 +1,5 @@
 # ICP_Query
-ICP备案查询，基于Python3.8，全异步构建的高性能ICP查询模块，直接从工业和信息化部政务服务平台抓取实时数据，支持Web、APP、小程序、快应用名称查询，支持根据备案号查询，同时提供简单易用的高性能接口，提供打包好的可执行程序
+ICP备案查询，基于Python3.8，全异步构建的高性能ICP查询模块，直接从工业和信息化部政务服务平台抓取实时数据，支持Web、APP、小程序、快应用名称查询，支持根据备案号查询，支持根据企业名称查询，同时提供简单易用的高性能接口，提供打包好的可执行程序
 
 
 ### 安装依赖
@@ -40,6 +40,11 @@ asyncio.run(main("微信"))
         ```
         curl http://127.0.0.1:16181/query/web?search=京ICP证030173号
         ```
+    - 示例: 根据企业名称查询备案信息
+      
+        ```
+        curl http://127.0.0.1:16181/query/web?search=深圳市腾讯计算机系统有限公司
+        ```
 2. POST
    - headers : {"Content-Type": "application/json"}
    - URL: http://0.0.0.0:16181/query/{type}
@@ -53,6 +58,11 @@ asyncio.run(main("微信"))
       
         ```
         curl -X POST -H "Content-Type: application/json" -d '{"search":"京ICP证030173号"}' http://127.0.0.1:16181/query/web
+        ```
+    - 示例: 根据企业名称查询备案信息
+      
+        ```
+        curl -X POST -H "Content-Type: application/json" -d '{"search":"深圳市腾讯计算机系统有限公司"}' http://127.0.0.1:16181/query/web
         ```
 
 ##### 3. Linux 运行icpApi
