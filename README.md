@@ -45,6 +45,11 @@ asyncio.run(main("微信"))
         ```
         curl http://127.0.0.1:16181/query/web?search=深圳市腾讯计算机系统有限公司
         ```
+    - 示例: 根据企业名称查询备案信息，每页20条数据，查询第3页
+      
+        ```
+        curl http://127.0.0.1:16181/query/web?search=深圳市腾讯计算机系统有限公司&pageNum=3&pageSize=20
+        ```
 2. POST
    - headers : {"Content-Type": "application/json"}
    - URL: http://0.0.0.0:16181/query/{type}
@@ -63,6 +68,11 @@ asyncio.run(main("微信"))
       
         ```
         curl -X POST -H "Content-Type: application/json" -d '{"search":"深圳市腾讯计算机系统有限公司"}' http://127.0.0.1:16181/query/web
+        ```
+    - 示例: 根据企业名称查询备案信息，每页20条数据，查询第3页
+      
+        ```
+        curl -X POST -H "Content-Type: application/json" -d '{"search":"深圳市腾讯计算机系统有限公司","pageNum":3,"pageSize":20}' http://127.0.0.1:16181/query/web
         ```
 
 ##### 3. Linux 运行icpApi
