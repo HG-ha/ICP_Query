@@ -70,14 +70,22 @@ async def geturl(request):
     
     if request.method == "GET":
         appname = request.query.get("search")
+        pageNum = request.query.get("pageNum")
+        pageSize = request.query.get("pageSize")
     if request.method == "POST":
         data = await request.json()
         appname = data.get("search")
+        pageNum = data.get("pageNum")
+        pageSize = data.get("pageSize")
 
     if not appname:
         return wj({"code":101,"msg":"参数错误,请指定search参数"})
     
-    return wj(await appth.get(path)(appname))
+    return wj(await appth.get(path)(
+        appname,
+        pageNum if str(pageNum) else '',
+        pageSize if str(pageSize) else ''
+        ))
 
 if __name__ == '__main__':
 
