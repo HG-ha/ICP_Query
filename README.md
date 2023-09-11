@@ -78,43 +78,43 @@ asyncio.run(main("微信"))
 [API文档](http://api.wer.plus/inteface?id=6)
 
 
-| 参数 | 说明 |
+|  参数             |  说明                |
 <br>
-| firstPage | 第一页的序号 |
+|  firstPage        |  第一页的序号        |
 <br>
-| hasNextPage | 是否有下一页 |
+|  hasNextPage      |  是否有下一页        |
 <br>
-| isFirstPage | 是否最后一页 |
+|  isFirstPage      |  是否最后一页        |
 <br>
-| lastPage | 根据当前pageSize，可有多少页 |
+|  lastPage         |  据查询数量有多少页  |
 <br>
-| pages | 同lastPage |
+|  pages            |  同lastPage          |
 <br>
-| pageSize | 每页几条数据 |
+|  pageSize         |  每页几条数据        |
 <br>
-| pageNum | 第几页 |
+|  pageNum          |  第几页              |
 <br>
-| nextPage | 下一页的页面序号 |
+|  nextPage         |  下一页的页面序号    |
 <br>
-| total | 同pages |
+|  total            |  同pages             |
 <br>
-| domain | 备案的域名 |
+|  domain           |  备案的域名          |
 <br>
-| domainId | 域名id |
+|  domainId         |  域名id              |
 <br>
-| limitAccess | 是否限制接入 |
+|  limitAccess      |  是否限制接入        |
 <br>
-| mainLicence | ICP备案主体许可证号 |
+|  mainLicence      |  ICP备案主体许可证号 |
 <br>
-| natureName | 主办单位性质 |
+|  natureName       |  主办单位性质        |
 <br>
-| serviceLicence | ICP备案服务许可证号 |
+|  serviceLicence   |  ICP备案服务许可证号 |
 <br>
-| unitName | 主办单位名称 |
+|  unitName         |  主办单位名称        |
 <br>
-| updateRecordTime | 审核通过日期 |
+|  updateRecordTime |  审核通过日期        |
 <br>
-| contentTypeName | 服务前置审批项 |
+|  contentTypeName  |  服务前置审批项      |
     
 ### 请喝茶吗
 
