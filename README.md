@@ -76,6 +76,28 @@ asyncio.run(main("微信"))
 
 ##### 5. 直接使用在线API
 [API文档](http://api.wer.plus/inteface?id=6)
+
+
+| 参数 | 说明 |
+| firstPage | 第一页的序号 |
+| hasNextPage | 是否有下一页 |
+| isFirstPage | 是否最后一页 |
+| lastPage | 根据当前pageSize，可有多少页 |
+| pages | 同lastPage |
+| pageSize | 每页几条数据 |
+| pageNum | 第几页 |
+| nextPage | 下一页的页面序号 |
+| total | 同pages |
+| domain | 备案的域名 |
+| domainId | 域名id |
+| limitAccess | 是否限制接入 |
+| mainLicence | ICP备案主体许可证号 |
+| natureName | 主办单位性质 |
+| serviceLicence | ICP备案服务许可证号 |
+| unitName | 主办单位名称 |
+| updateRecordTime | 审核通过日期 |
+| contentTypeName | 服务前置审批项 |
+
     
 ### 请喝茶吗
 
