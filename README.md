@@ -97,7 +97,7 @@ asyncio.run(main("微信"))
 ##### 5. 直接使用在线API
 [API文档](http://api.wer.plus/inteface?id=6)
 
-
+### 参数说明
 |  参数             |  说明                |
 |  ----  | ----  |
 |  lastPage         |  据查询数量有多少页  |
