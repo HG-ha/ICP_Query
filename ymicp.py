@@ -20,11 +20,11 @@ import ujson
 class beian():
     def __init__(self):
         self.typj = {
-            0:ujson.dumps({
-                'pageNum': '', 'pageSize': '', 'unitName': '',"serviceType":1}
+            0:ujson.dumps(
+                {'pageNum': '', 'pageSize': '', 'unitName': '',"serviceType":1}
                 ), # 网站
-            1:ujson.dumps({
-                "pageNum":"","pageSize":"","unitName":'',"serviceType":6}
+            1:ujson.dumps(
+                {"pageNum":"","pageSize":"","unitName":'',"serviceType":6}
                 ), # APP
             2:ujson.dumps(
                 {'pageNum': '', 'pageSize': '', 'unitName': '',"serviceType":7}
@@ -111,8 +111,10 @@ class beian():
         mouse_length = max_loc+1
         return mouse_length
 
-    async def getbeian(self,name,sp):
+    async def getbeian(self,name,sp,pageNum,pageSize,):
         info = ujson.loads(self.typj.get(sp))
+        info['pageNum'] = pageNum
+        info['pageSize'] = pageSize
         info['unitName'] = name
         sign = await self.check_img()
         length = str(len(str(ujson.dumps(info,ensure_ascii=False)).encode('utf-8')))
@@ -121,44 +123,42 @@ class beian():
             res = await req.text()
             return ujson.loads(res)
 
-    async def autoget(self,name,sp):
+    async def autoget(self,name,sp,pageNum,pageSize):
         await self._init_session()
         try:
-            data = await self.getbeian(name,sp)
+            data = await self.getbeian(name,sp,pageNum,pageSize)
         except Exception as e:
+            print(e)
             return {"code":122,"msg":"查询失败"}
         finally:
             await self._close_session()
 
         if data['code'] == 500:
             return {"code":122,"msg":"工信部服务器异常"}
-        infuNum = len(data['params']['list'])
-        if infuNum == 0:
-            return {"code":200,"msg":"success","count":infuNum,"data":[]}
-        return {"code":200,"msg":"success","count":infuNum,"data":data['params']['list']}
+        return data
 
     # APP备案查询
-    async def ymApp(self,name):
-        return await self.autoget(name,1)
+    async def ymApp(self,name,pageNum='',pageSize=''):
+        return await self.autoget(name,1,pageNum,pageSize)
 
     # 网站备案查询
-    async def ymWeb(self,name):
-        return await self.autoget(name,0)
+    async def ymWeb(self,name,pageNum='',pageSize=''):
+        return await self.autoget(name,0,pageNum,pageSize)
 
     # 小程序备案查询
-    async def ymMiniApp(self,name):
-        return await self.autoget(name,2)
+    async def ymMiniApp(self,name,pageNum='',pageSize=''):
+        return await self.autoget(name,2,pageNum,pageSize)
 
     # 快应用备案查询
-    async def ymKuaiApp(self,name):
-        return await self.autoget(name,3)
+    async def ymKuaiApp(self,name,pageNum='',pageSize=''):
+        return await self.autoget(name,3,pageNum,pageSize)
 
 if __name__ == '__main__':
     async def main():
         a = beian()
-        data = await a.ymApp("微信")
-        # data = await a.ymWeb("京ICP证030173号")
-        print(data)
+        # 官方单页查询pageSize最大支持26
+        # 页面索引pageNum从1开始,第一页可以不写
+        data = await a.ymWeb("深圳市腾讯计算机系统有限公司",pageSize=10,pageNum=2)
         return data
     asyncio.run(main())
 
