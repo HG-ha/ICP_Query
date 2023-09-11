@@ -100,12 +100,6 @@ asyncio.run(main("微信"))
 
 |  参数             |  说明                |
 <br>
-|  firstPage        |  第一页的序号        |
-<br>
-|  hasNextPage      |  是否有下一页        |
-<br>
-|  isFirstPage      |  是否最后一页        |
-<br>
 |  lastPage         |  据查询数量有多少页  |
 <br>
 |  pages            |  同lastPage          |
@@ -135,6 +129,9 @@ asyncio.run(main("微信"))
 |  updateRecordTime |  审核通过日期        |
 <br>
 |  contentTypeName  |  服务前置审批项      |
+<br>
+|  CityId           |  城市ID              |
+
     
 ### 请喝茶吗
 
