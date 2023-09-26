@@ -24,10 +24,10 @@ asyncio.run(main("微信"))
 ### 使用icpApi查询接口
 ##### 已内置解决前端跨域
 ##### 1. 支持四种类型查询：
-- 网站： web
-- APP: app
-- 小程序: mapp
-- 快应用: kapp
+- 网站：web
+- APP：app
+- 小程序：mapp
+- 快应用：kapp
 ##### 2. 请求
 1. GET
     - URL: http://0.0.0.0:16181/query/{type}?search={name}
