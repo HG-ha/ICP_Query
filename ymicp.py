@@ -20,16 +20,16 @@ import ujson
 class beian():
     def __init__(self):
         self.typj = {
-            0: ujson.dumps({
-                'pageNum': '', 'pageSize': '', 'unitName': '',"serviceType":1}
+            0:ujson.dumps(
+                {'pageNum': '', 'pageSize': '', 'unitName': '',"serviceType":1}
                 ), # 网站
-            1: ujson.dumps({
-                "pageNum":"","pageSize":"","unitName":'',"serviceType":6}
+            1:ujson.dumps(
+                {"pageNum":"","pageSize":"","unitName":'',"serviceType":6}
                 ), # APP
-            2: ujson.dumps(
+            2:ujson.dumps(
                 {'pageNum': '', 'pageSize': '', 'unitName': '',"serviceType":7}
                 ), # 小程序
-            3: ujson.dumps(
+            3:ujson.dumps(
                 {'pageNum': '', 'pageSize': '', 'unitName': '',"serviceType":8}
                 ) # 快应用
         }
@@ -122,8 +122,10 @@ class beian():
         mouse_length = max_loc+1
         return mouse_length
 
-    async def getbeian(self,name,sp):
+    async def getbeian(self,name,sp,pageNum,pageSize,):
         info = ujson.loads(self.typj.get(sp))
+        info['pageNum'] = pageNum
+        info['pageSize'] = pageSize
         info['unitName'] = name
         sign = await self.check_img()
         length = str(len(str(ujson.dumps(info,ensure_ascii=False)).encode('utf-8')))
@@ -148,62 +150,58 @@ class beian():
             res = await req.text()
             return ujson.loads(res)
 
-    async def autoget(self,name,sp,b=1):
+    async def autoget(self,name,sp,pageNum='',pageSize='',b=1):
         await self._init_session()
         try:
-            data = await self.getbeian(name,sp) if b == 1 else await self.getblackbeian(name,sp)
+            data = await self.getbeian(name,sp,pageNum,pageSize) if b == 1 else await self.getblackbeian(name,sp)
         except Exception as e:
+            print(e)
             return {"code":122,"msg":"查询失败"}
         finally:
             await self._close_session()
 
         if data['code'] == 500:
             return {"code":122,"msg":"工信部服务器异常"}
-        if b == 1:
-            infuNum = len(data['params']['list'])
-            if infuNum == 0:
-                return {"code":200,"msg":"success","count":infuNum,"data":[]}
-            return {"code":200,"msg":"success","count":infuNum,"data":data['params']['list']}
-        else:
-            return data
+        return data
 
     # APP备案查询
-    async def ymApp(self,name):
-        return await self.autoget(name,1)
+    async def ymApp(self,name,pageNum='',pageSize=''):
+        return await self.autoget(name,1,pageNum,pageSize)
 
     # 网站备案查询
-    async def ymWeb(self,name):
-        return await self.autoget(name,0)
+    async def ymWeb(self,name,pageNum='',pageSize=''):
+        return await self.autoget(name,0,pageNum,pageSize)
 
     # 小程序备案查询
-    async def ymMiniApp(self,name):
-        return await self.autoget(name,2)
+    async def ymMiniApp(self,name,pageNum='',pageSize=''):
+        return await self.autoget(name,2,pageNum,pageSize)
 
     # 快应用备案查询
-    async def ymKuaiApp(self,name):
-        return await self.autoget(name,3)
+    async def ymKuaiApp(self,name,pageNum='',pageSize=''):
+        return await self.autoget(name,3,pageNum,pageSize)
     
     # 违法违规APP查询
     async def bymApp(self,name):
-        return await self.autoget(name,1,0)
+        return await self.autoget(name,1,b=0)
 
     # 违法违规网站查询
     async def bymWeb(self,name):
-        return await self.autoget(name,0,0)
+        return await self.autoget(name,0,b=0)
 
     # 违法违规小程序查询
     async def bymMiniApp(self,name):
-        return await self.autoget(name,2,0)
+        return await self.autoget(name,2,b=0)
 
     # 违法违规快应用查询
     async def bymKuaiApp(self,name):
-        return await self.autoget(name,3,0)
+        return await self.autoget(name,3,b=0)
 
 if __name__ == '__main__':
     async def main():
         a = beian()
-        data = await a.bymMiniApp("微信")
-        # data = await a.ymWeb("京ICP证030173号")
+        # 官方单页查询pageSize最大支持26
+        # 页面索引pageNum从1开始,第一页可以不写
+        data = await a.bymWeb("qq.com")
         print(data)
         return data
     asyncio.run(main())
