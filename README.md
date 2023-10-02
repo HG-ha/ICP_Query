@@ -23,11 +23,15 @@ asyncio.run(main("微信"))
 
 ### 使用icpApi查询接口
 ##### 已内置解决前端跨域
-##### 1. 支持四种类型查询：
+##### 1. 支持八种类型查询：
 - 网站：web
 - APP：app
 - 小程序：mapp
 - 快应用：kapp
+- 违法违规网站：bweb
+- 违法违规APP：bapp
+- 违法违规小程序：bmapp
+- 违法违规快应用：bkapp
 ##### 2. 请求
 1. GET
     - URL: http://0.0.0.0:16181/query/{type}?search={name}
@@ -122,6 +126,7 @@ asyncio.run(main("微信"))
 |  mainUnitAddress  |  主体地址           |
 |  serviceName      |  服务名称(APP、小程序或快应用名称)  |
 |  version          |  服务版本           |
+|  blackListLevel  | 威胁等级,表示是否为违法违规应用，目前获得的等级为2时，表示暂无违法违规信息 |
 
     
 ### 请喝茶吗
