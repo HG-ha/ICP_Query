@@ -65,7 +65,7 @@ async def options_middleware(app, handler):
 async def geturl(request):
     path = request.match_info['path']
 
-    if path not in appth:
+    if path not in appth and path not in bappth:
         return wj({"code":102,"msg":"不是支持的查询类型"})
     
     if request.method == "GET":
@@ -80,12 +80,15 @@ async def geturl(request):
 
     if not appname:
         return wj({"code":101,"msg":"参数错误,请指定search参数"})
-    
-    return wj(await appth.get(path)(
-        appname,
-        pageNum if str(pageNum) else '',
-        pageSize if str(pageSize) else ''
-        ))
+
+    if path in appth:
+        return wj(await appth.get(path)(
+            appname,
+            pageNum if str(pageNum) else '',
+            pageSize if str(pageSize) else ''
+            ))
+    else:
+        return wj(await bappth.get(path)(appname))
 
 if __name__ == '__main__':
 
@@ -94,7 +97,15 @@ if __name__ == '__main__':
         "web": myicp.ymWeb,    # 网站
         "app": myicp.ymApp,    # APP
         "mapp": myicp.ymMiniApp,   # 小程序
-        "kapp": myicp.ymKuaiApp    # 快应用
+        "kapp": myicp.ymKuaiApp,    # 快应用
+    }
+    
+    # 违法违规应用不支持翻页
+    bappth = {
+        "bweb": myicp.bymWeb,    # 违法违规网站
+        "bapp": myicp.bymApp,    # 违法违规APP
+        "bmapp": myicp.bymMiniApp,   # 违法违规小程序
+        "bkapp": myicp.bymKuaiApp    # 违法违规快应用
     }
     app = web.Application()
     app.add_routes(routes)
