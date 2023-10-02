@@ -80,7 +80,7 @@ async def geturl(request):
 
     if not appname:
         return wj({"code":101,"msg":"参数错误,请指定search参数"})
-
+    
     if path in appth:
         return wj(await appth.get(path)(
             appname,
