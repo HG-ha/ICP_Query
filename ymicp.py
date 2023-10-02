@@ -20,25 +20,36 @@ import ujson
 class beian():
     def __init__(self):
         self.typj = {
-            0:ujson.dumps(
-                {'pageNum': '', 'pageSize': '', 'unitName': '',"serviceType":1}
+            0: ujson.dumps({
+                'pageNum': '', 'pageSize': '', 'unitName': '',"serviceType":1}
                 ), # 网站
-            1:ujson.dumps(
-                {"pageNum":"","pageSize":"","unitName":'',"serviceType":6}
+            1: ujson.dumps({
+                "pageNum":"","pageSize":"","unitName":'',"serviceType":6}
                 ), # APP
-            2:ujson.dumps(
+            2: ujson.dumps(
                 {'pageNum': '', 'pageSize': '', 'unitName': '',"serviceType":7}
                 ), # 小程序
-            3:ujson.dumps(
+            3: ujson.dumps(
                 {'pageNum': '', 'pageSize': '', 'unitName': '',"serviceType":8}
                 ) # 快应用
+        }
+        self.btypj = {
+            0: ujson.dumps({"domainName":""}),
+            1: ujson.dumps({"serviceName":"","serviceType":6}),
+            2: ujson.dumps({"serviceName":"","serviceType":7}),
+            3: ujson.dumps({"serviceName":"","serviceType":8})
         }
         self.cookie_headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/101.0.4951.41 Safari/537.36 Edg/101.0.1210.32'}
         self.home = 'https://beian.miit.gov.cn/'
         self.url = 'https://hlwicpfwc.miit.gov.cn/icpproject_query/api/auth'
         self.getCheckImage = 'https://hlwicpfwc.miit.gov.cn/icpproject_query/api/image/getCheckImage'
         self.checkImage = 'https://hlwicpfwc.miit.gov.cn/icpproject_query/api/image/checkImage'
+        # 正常查询
         self.queryByCondition = 'https://hlwicpfwc.miit.gov.cn/icpproject_query/api/icpAbbreviateInfo/queryByCondition'
+        # 违法违规域名查询
+        self.blackqueryByCondition = 'https://hlwicpfwc.miit.gov.cn/icpproject_query/api/blackListDomain/queryByCondition'
+        # 违法违规APP,小程序,快应用
+        self.blackappAndMiniByCondition = 'https://hlwicpfwc.miit.gov.cn/icpproject_query/api/blackListDomain/queryByCondition_appAndMini'
 
     async def _init_session(self):
         self.session = aiohttp.ClientSession()
@@ -111,10 +122,8 @@ class beian():
         mouse_length = max_loc+1
         return mouse_length
 
-    async def getbeian(self,name,sp,pageNum,pageSize,):
+    async def getbeian(self,name,sp):
         info = ujson.loads(self.typj.get(sp))
-        info['pageNum'] = pageNum
-        info['pageSize'] = pageSize
         info['unitName'] = name
         sign = await self.check_img()
         length = str(len(str(ujson.dumps(info,ensure_ascii=False)).encode('utf-8')))
@@ -122,47 +131,79 @@ class beian():
         async with self.session.post(self.queryByCondition, data=ujson.dumps(info,ensure_ascii=False), headers=self.base_header) as req:
             res = await req.text()
             return ujson.loads(res)
+        
+    async def getblackbeian(self,name,sp):
+        info = ujson.loads(self.btypj.get(sp))
+        if sp == 0:
+            info['domainName'] = name
+        else:
+            info['serviceName'] = name
+        sign = await self.check_img()
+        length = str(len(str(ujson.dumps(info,ensure_ascii=False)).encode('utf-8')))
+        self.base_header.update({'Content-Length': length, 'Uuid': self.p_uuid, 'Token': self.token, 'Sign': sign})
+        async with self.session.post(
+            self.blackqueryByCondition if sp == 0 else self.blackappAndMiniByCondition, 
+                                     data=ujson.dumps(info,ensure_ascii=False), 
+                                     headers=self.base_header) as req:
+            res = await req.text()
+            return ujson.loads(res)
 
-    async def autoget(self,name,sp,pageNum,pageSize):
+    async def autoget(self,name,sp,b=1):
         await self._init_session()
         try:
-            data = await self.getbeian(name,sp,pageNum,pageSize)
+            data = await self.getbeian(name,sp) if b == 1 else await self.getblackbeian(name,sp)
         except Exception as e:
-            print(e)
             return {"code":122,"msg":"查询失败"}
         finally:
             await self._close_session()
 
         if data['code'] == 500:
             return {"code":122,"msg":"工信部服务器异常"}
-        return data
+        if b == 1:
+            infuNum = len(data['params']['list'])
+            if infuNum == 0:
+                return {"code":200,"msg":"success","count":infuNum,"data":[]}
+            return {"code":200,"msg":"success","count":infuNum,"data":data['params']['list']}
+        else:
+            return data
 
     # APP备案查询
-    async def ymApp(self,name,pageNum='',pageSize=''):
-        return await self.autoget(name,1,pageNum,pageSize)
+    async def ymApp(self,name):
+        return await self.autoget(name,1)
 
     # 网站备案查询
-    async def ymWeb(self,name,pageNum='',pageSize=''):
-        return await self.autoget(name,0,pageNum,pageSize)
+    async def ymWeb(self,name):
+        return await self.autoget(name,0)
 
     # 小程序备案查询
-    async def ymMiniApp(self,name,pageNum='',pageSize=''):
-        return await self.autoget(name,2,pageNum,pageSize)
+    async def ymMiniApp(self,name):
+        return await self.autoget(name,2)
 
     # 快应用备案查询
-    async def ymKuaiApp(self,name,pageNum='',pageSize=''):
-        return await self.autoget(name,3,pageNum,pageSize)
+    async def ymKuaiApp(self,name):
+        return await self.autoget(name,3)
+    
+    # 违法违规APP查询
+    async def bymApp(self,name):
+        return await self.autoget(name,1,0)
+
+    # 违法违规网站查询
+    async def bymWeb(self,name):
+        return await self.autoget(name,0,0)
+
+    # 违法违规小程序查询
+    async def bymMiniApp(self,name):
+        return await self.autoget(name,2,0)
+
+    # 违法违规快应用查询
+    async def bymKuaiApp(self,name):
+        return await self.autoget(name,3,0)
 
 if __name__ == '__main__':
     async def main():
         a = beian()
-        # 官方单页查询pageSize最大支持26
-        # 页面索引pageNum从1开始,第一页可以不写
-        # 查询该公司的网站备案信息，每页10条数据，查询第二页
-        data = await a.ymWeb("深圳市腾讯计算机系统有限公司",pageSize=10,pageNum=2)
-        print(data)
-        # 查询微信APP的备案信息
-        data = await a.ymApp("微信")
+        data = await a.bymMiniApp("微信")
+        # data = await a.ymWeb("京ICP证030173号")
         print(data)
         return data
     asyncio.run(main())
