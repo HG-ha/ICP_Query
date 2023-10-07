@@ -103,6 +103,7 @@ class beian():
         except Exception as e:
             print(e)
             print("过验证码失败,自动递归重试")
+            # 如若不想自动递归，请支持抛出错误，注释下方代码
             return await self.check_img()
         
     async def get_sign(self):
