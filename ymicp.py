@@ -151,9 +151,7 @@ if __name__ == '__main__':
         a = beian()
         # 官方单页查询pageSize最大支持26
         # 页面索引pageNum从1开始,第一页可以不写
-        data = await a.ymWeb("深圳市腾讯计算机系统有限公司",pageSize=1)
-        print(data)
-        return data
+        print(await a.ymWeb("深圳市腾讯计算机系统有限公司",pageSize=1)
     asyncio.run(main())
 
     '''
