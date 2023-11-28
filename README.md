@@ -10,7 +10,7 @@
 1. 当前只给出加密算法，点选验证码识别率低尚未解决
 2. 目前自测通过的加密验证，识别率有待提升
    ![NG 3DM 81_FUH2OAR3V~DCR](https://github.com/HG-ha/ICP_Query/assets/60115106/a41a6220-72f3-44c1-99d8-32cf7ad038a5)
-3. 新增的对应算法
+3. 新增的对应算法，自己去安装对应模块
 ``` python
   # 新增的clientUid加密生成算法
     def get_clientUid(self):
