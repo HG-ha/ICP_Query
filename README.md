@@ -6,6 +6,36 @@
 5. 健壮的代码以及内部错误处理机制，确保所有响应都是可解析的
 6. 内置解决前端跨域问题
 
+### 关于新增的加密算法例子
+1. 当前只给出加密算法，点选验证码识别率低尚未解决
+2. 目前自测通过的加密验证，识别率有待提升
+   ![NG 3DM 81_FUH2OAR3V~DCR](https://github.com/HG-ha/ICP_Query/assets/60115106/a41a6220-72f3-44c1-99d8-32cf7ad038a5)
+3. 新增的对应算法
+``` python
+  # 新增的clientUid加密生成算法
+    def get_clientUid(self):
+        characters = "0123456789abcdef"
+        unique_id = ['0'] * 36
+
+        for i in range(36):
+            unique_id[i] = random.choice(characters)
+
+        unique_id[14] = '4'
+        unique_id[19] = characters[(3 & int(unique_id[19], 16)) | 8]
+        unique_id[8] = unique_id[13] = unique_id[18] = unique_id[23] = "-"
+
+        point_id = "point-" + ''.join(unique_id)
+
+        return ujson.dumps({"clientUid":point_id})
+
+    # poinJson加密方法
+    def get_pointJson(self,value,key):
+        cipher = AES.new(key.encode(), AES.MODE_ECB)
+        ciphertext = cipher.encrypt(pad(ujson.dumps(value).encode(), AES.block_size))
+        ciphertext_base64 = base64.b64encode(ciphertext)
+        return ciphertext_base64.decode('utf-8')
+```
+
 
 ### 安装依赖
 ``` shell
