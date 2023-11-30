@@ -2,3 +2,4 @@ aiohttp==3.7.4.post0
 ujson==5.8.0
 opencv-python==4.5.5.64
 numpy==1.19.3
+pycryptodome==3.17
