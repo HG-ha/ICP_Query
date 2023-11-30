@@ -7,7 +7,9 @@
 6. 内置解决前端跨域问题
 
 ### 视频演示
-<iframe height=760 width=1280 src="https://github.com/HG-ha/ICP_Query/blob/main/windows%E6%BC%94%E7%A4%BA.mp4">
+1. windows
+   [视频链接](https://github.com/HG-ha/ICP_Query/blob/main/windows%E6%BC%94%E7%A4%BA.mp4)
+    
 ### 安装依赖
 ``` shell
 # 可以使用低版本包，基本都包含需要的模块
