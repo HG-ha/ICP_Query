@@ -6,7 +6,7 @@
 5. 健壮的代码以及内部错误处理机制，确保所有响应都是可解析的
 6. 内置解决前端跨域问题
 
-### 视频演示
+### （本地手动点选）视频演示
 1. windows
    <video src="https://github.com/HG-ha/ICP_Query/assets/60115106/3b85ca9c-6925-49f4-a842-7ebf85b56675"></video>
     
