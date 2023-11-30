@@ -8,9 +8,11 @@
 
 ### 视频演示
 1. windows
-   [视频链接](https://github.com/HG-ha/ICP_Query/blob/main/windows%E6%BC%94%E7%A4%BA.mp4)
+   <video src="https://github.com/HG-ha/ICP_Query/assets/60115106/3b85ca9c-6925-49f4-a842-7ebf85b56675"></video>
     
-### 安装依赖
+### 安装
+
+依赖
 ``` shell
 # 可以使用低版本包，基本都包含需要的模块
 pip install -r requirements.txt
