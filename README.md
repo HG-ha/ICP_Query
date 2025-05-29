@@ -199,7 +199,7 @@ asyncio.run(main("微信"))
 2. 独立程序直接双击运行
 
 ##### 5. 直接使用在线API
-[API文档](http://api2.wer.plus/inteface?id=6)
+[API文档](https://api2.wer.plus/doc/14)
 
 ### 参数说明
 |  参数             |  说明                |
