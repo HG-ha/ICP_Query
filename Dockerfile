@@ -11,13 +11,7 @@ RUN mkdir -p /icp_Api
 WORKDIR /icp_Api
 
 # 更新 apt 源并安装依赖
-RUN echo 'deb https://mirrors.tuna.tsinghua.edu.cn/debian/ buster main non-free contrib' > /etc/apt/sources.list \
-    && echo 'deb-src https://mirrors.tuna.tsinghua.edu.cn/debian/ buster main non-free contrib' >> /etc/apt/sources.list \
-    && echo 'deb https://mirrors.tuna.tsinghua.edu.cn/debian-security buster/updates main' >> /etc/apt/sources.list \
-    && echo 'deb-src https://mirrors.tuna.tsinghua.edu.cn/debian-security buster/updates main' >> /etc/apt/sources.list \
-    && echo 'deb https://mirrors.tuna.tsinghua.edu.cn/debian/ buster-updates main non-free contrib' >> /etc/apt/sources.list \
-    && echo 'deb-src https://mirrors.tuna.tsinghua.edu.cn/debian/ buster-updates main non-free contrib' >> /etc/apt/sources.list \
-    && apt-get update -y \
+RUN apt-get update -y \
     && apt-get install -y libgl1 \
     && rm -rf /var/lib/apt/lists/*
 
