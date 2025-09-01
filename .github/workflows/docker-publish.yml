@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths:
-      - 'main.py' # 仅当包含版本号的文件更改时触发
+      - 'icpApi.py' # 仅当包含版本号的文件更改时触发
 
 jobs:
   build-and-push:
