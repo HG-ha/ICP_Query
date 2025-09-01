@@ -21,13 +21,11 @@ jobs:
       - name: Extract version from icpApi.py
         id: extract_version
         run: |
-          # 从 icpApi.py 中提取版本号，例如 "0.0.2"
           VERSION_STRING=$(grep -Po 'VERSION="\K[0-9]+\.[0-9]+\.[0-9]+(?=")' icpApi.py)
           if [ -z "$VERSION_STRING" ]; then
             echo "Version not found in icpApi.py"
             exit 1
           fi
-          # 添加 "v" 前缀，例如 "v0.0.2"
           echo "VERSION=v$VERSION_STRING" >> $GITHUB_OUTPUT
           echo "Extracted version for tagging: v$VERSION_STRING"
 
