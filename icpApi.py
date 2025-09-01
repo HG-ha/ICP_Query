@@ -20,7 +20,7 @@ import subprocess
 import uuid
 import locale
 
-VERSION = "0.6"
+VERSION = "0.6.0"
 
 pool_cache = TTLCache(maxsize=config.proxy.extra_api.pool_num, 
                       ttl=config.proxy.extra_api.timeout - config.proxy.extra_api.timeout_drop)
