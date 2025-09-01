@@ -1,0 +1,124 @@
+# 系统基础配置，注意检查防火墙配置
+system:
+  # 监听地址
+  host: "0.0.0.0"
+  # 监听端口
+  port: 16181
+
+  # 请求超时时间，默认5秒
+  http_client_timeout: 2
+
+  # 启动web界面，可视化批量提交查询，导出为excel
+  # 地址：http://{host}:{port}
+  web_ui: false
+
+  # 详情并发请求数
+  detail_concurrency: 5
+
+# 打码配置
+captcha:
+  # 保存检测失败的验证码，存放在{save_failed_img_path}
+  save_failed_img: false
+  # 检测失败的验证码的存放路径
+  save_failed_img_path: "faile_captcha"
+
+  # 用于检测的设备，CUDA表示使用显卡的cuda加速，需要正确配置CUDA环境，否则使用CPU，默认CPU
+  device: ["CPU"]
+
+  # 查询失败时的重试次数，失败可能是由于目标网络、本地网络、代理、打码失败引起
+  # 由于官方插入了大量干扰强的验证码，导致人工点选的准确率也大幅下降
+  retry_times: 50
+
+  # 打码方式，默认自动打码，可选人工：labour，默认auto，人工打码需要桌面环境支持
+  coding_code: auto
+
+  # 是否在桌面查看打码效果，手动打码时此参数无效
+  coding_show: false
+
+# 代理相关
+# 如果你需要极速响应，试试不用代理
+# 很多供应商都对gov.cn有限制，记得问清楚
+# 没找到什么好用的代理池，如果有，记得推荐
+# 建议用隧道代理，或每次通过proxy传入自定义代理
+# 代理优先级：proxy参数 > local_ipv6_pool > tunnel > extra_api > 环境变量
+# 当使用web ui时，proxy参数无效
+proxy:
+  # 本地ipv6轮询
+  # 注意，需要确保本地网络支持ipv6，且为公网ipv6，目前支持/64及以上的ipv6地址
+  # 本地ipv6的优先级高于其他代理，会在程序启动时自动配置
+  # 请确保当前机器只运行了此脚本，否则可能会影响其他使用ipv6网络的程序
+  # 使用ipv6是目前最稳定的代理方式，且几乎无成本
+  local_ipv6_pool:
+    # 是否启用本地ipv6轮询
+    enable: false
+    # 本地ipv6的数量
+    pool_num: 88
+    # 本地ipv6的检测间隔（秒）
+    check_interval: 1
+
+    # 本地具有公网IPv6的网卡名称
+    # windows下的网卡名称可以通过cmd命令ipconfig查看，通常为WLAN、以太网等
+    # linux下的网卡名称可以通过ifconfig查看，通常为eth0、eth1、ens33等
+    # mac下的网卡名称可以通过ifconfig查看，通常为en0、en1等
+    ipv6_network_card: "eth0"
+
+  # 隧道代理
+  tunnel:
+    # 隧道代理url，如：http://username:password@domain.com:12345
+    url:
+
+  # 通过API提取代理
+  # 提取的格式必须是txt，分隔符为\n，协议为http或自动，提取数量自定
+  extra_api:
+    # 用于提取代理的API地址，如http://xxxproxy.com?getnum=5
+    url: 
+    # 提取代理的间隔（秒），当提取时，会自动挤掉最早提取的IP，请合理配置以下参数
+    extra_interval: 3
+
+    # 当配置API提取代理时，需要指定该代理的超时时间（秒），代理存活时间
+    timeout: 100
+
+    # 当代理还有8秒超时，清除该代理
+    timeout_drop: 8
+
+    # 从API提取代理时是否校验代理可用性，开启后将确认代理可用后才入库到本地代理池
+    # 但一定程度上会影响提取代理的性能
+    check_proxy: true
+    # 本地代理池在入库时进行检测，响应时间不得超过0.5秒
+    proxy_timeout: 0.5
+    # 入库检测的并发任务数量
+    check_proxy_num: 20
+
+    # 自动维护本地代理池，启用时，将按照指定间隔去提取代理IP，并在本地形成代理池
+    # 会自动根据超时时间去剔除不可用的IP，自动补充新的IP，同时会剔除不可用的代理
+    # 否则在每次请求时从该API拉取代理
+    auto_maintenace: true
+
+    # 本地代理池最大数量，表示当本地代理池中的IP达到该数量时停止拉取新的IP
+    pool_num: 100
+
+  # 其他代理方式
+  # 1. 直接在系统环境变量配置http代理
+  # 2. 通过在调用api时传入 'proxy' 参数来使用指定代理，不要加协议头
+  #    可以为每次查询请求指定不同的代理
+  #    例：http://{host}:{port}/web?search=qq.com&proxy=1.1.1.1:1111
+
+risk_avoidance:
+  # 允许查询的类型
+  allow_type: ["web", "app", "mapp", "kapp", "bweb", "bapp", "bmapp", "mkapp"]
+
+  # 不允许查询的域名后缀、主体、应用名称、备案号等
+  prohibit_suffix:
+    []
+
+log:
+  # 存放日志的路径
+  dir: "logs"
+  # 日志文件头部名称
+  file_head: "ymicp"
+  # 保留 7 天的日志
+  backup_count: 7
+  # 是否保存日志，根据自己需求，（日志增长很快）
+  save_log: false
+  # 是否在控制台输出日志
+  output_console: true

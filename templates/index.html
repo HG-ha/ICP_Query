@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="zh">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ICP备案批量查询</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-GLhlTQ8iRABdZLl6O3oVMWSktQOp6b7In1Zl3/Jr59b6EGGoI1aFkw7cmDA6j6gD" crossorigin="anonymous">
+    <style>
+        body {
+            min-height: 100vh;
+            /* 使内容区域至少占满整个视口高度 */
+            display: flex;
+            flex-direction: column;
+        }
+
+        .content {
+            flex: 1;
+            /* 占据剩余的空间 */
+        }
+
+        .no-wrap {
+            white-space: nowrap;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1 class="text-center mt-5">ICP备案批量查询</h1>
+        <div class="mb-3 row mt-3">
+            <!-- 同时查询量 -->
+            <label class="col-sm-2 col-form-label" for="querynum">同时查询量</label>
+            <div class="col-sm-3">
+                <input type="text" class="form-control" id="querynum" value="20">
+            </div>
+
+            <!-- 查询类型 -->
+            <label class="col-sm-2 col-form-label" for="dropdown">查询类型</label>
+            <div class="col-sm-3">
+                <select id="dropdown" class="form-select">
+                    <option value="web" selected>域名</option>
+                    <option value="app">App</option>
+                    <option value="mapp">小程序</option>
+                    <option value="kapp">快应用</option>
+                    <option value="bweb">违规域名</option>
+                    <option value="bweb">违规App</option>
+                    <option value="bweb">违规小程序</option>
+                    <option value="bweb">违规快应用</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="mb-3 row">
+            <label class="col-sm-2 col-form-label">查询内容</label>
+            <div class="input-group mb-3 mt-1">
+                <textarea class="form-control" id="query_value" rows="3"
+                    placeholder="域名、程序名称、备案主体、备案号等，一行一个"></textarea>
+                <button class="btn btn-outline-secondary" type="button" id="button-addon2"
+                    onclick="getIcpInfo()">查询</button>
+                <button class="btn btn-outline-secondary" type="button" id="button-addon2"
+                    onclick="exportData()">导出</button>
+                <button class="btn btn-outline-secondary" type="button" id="button-addon2"
+                    onclick="deletetask()">终止任务</button>
+            </div>
+        </div>
+        <!-- 消息框 -->
+        <div id="liveAlertPlaceholder" class="mt-2 mt-3"></div>
+
+    </div>
+
+    <div class="container text-center">
+        <span id="provalue" style="display: none;">当前进度：0/0</span>
+        <div id="prohome" class="progress" role="progressbar" aria-label="Animated striped example" aria-valuenow="25"
+            aria-valuemin="0" aria-valuemax="100" style="display: none;">
+            <div id="pro" class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%"></div>
+        </div>
+        <!-- 加载效果 -->
+        <div class="container mt-3 me-3 ms-3" style="display: none;" id="netload">
+            <button class="btn btn-primary">
+                <span class="spinner-border spinner-border-sm"></span>
+                Loading..
+            </button>
+        </div>
+    </div>
+
+    <!-- 输出结果 -->
+    <div class="container text-left mt-3 content">
+        <div id="query_result" class="table-responsive"></div>
+    </div>
+
+    <!-- 引用bootstrap -->
+    <!-- 5.3.0js部分问题，暂时引用低版本 -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-kenU1KFdBIe4zVF0s0G1M5b4hcpxyD9F7jL+jjXkk+Q2h455rYXK/7HAuoJl+0I4"
+        crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+    <!-- 提交查询数据 -->
+    <script>
+        function getIcpInfo() {
+            // 获取输入数据
+            var query_value = document.getElementById("query_value").value;
+            var inputList = query_value.split('\n').filter(line => line.trim() !== '');
+            // 获取允许同时查询的数量
+            var querynum = document.getElementById('querynum').value;
+            // 获取进度条
+            var progresshome = document.getElementById("prohome");
+            var progress = document.getElementById("pro");
+            // 进度条数值
+            var progressvalue = document.getElementById("provalue");
+            // 任务类型
+            var dropdown = document.getElementById('dropdown').value;
+
+            if (!query_value) {
+                eralert("查询内容为空");
+                return;
+            }
+
+            progresshome.style.display = '';
+            progressvalue.textContent = '';
+            progressvalue.style.display = '';
+            progress.style.width = '0%';
+            const timeStamp = new Date().getTime();
+            const taskname = `icp_${dropdown}_${timeStamp}`;
+            window.taskname = taskname;
+            var jsonData = JSON.stringify({
+                "task": taskname,
+                "data": inputList,
+                "type": dropdown,
+                "querynum": querynum
+            });
+            http('POST', '/create/task', jsonData)
+                .then(function (data) {
+                    sualert(`已提交任务 ${taskname} 请耐心等待任务完成`);
+                })
+                .catch(function (error) {
+                    eralert(error);
+                    console.log(error);
+                })
+            async function loop() {
+                while (true) {
+                    try {
+                        const data = await http('GET', `/query/task?taskname=${taskname}`);
+                        const parsedData = JSON.parse(data);
+                        progressvalue.textContent = `任务 ${taskname} 当前进度：${parsedData.curpro} / ${parsedData.numpro}`;
+                        progress.style.width = `${parsedData.progress}%`
+                        if (parsedData.code == 404) {
+                            progressvalue.textContent = '任务不存在';
+                            progresshome.style.display = none;
+                            progress.style.width = '0%';
+                            progress.style.display = none;
+                            break;
+                        }
+                        // 检查条件并在条件符合时跳出循环
+                        if (parsedData.progress === 100) {
+                            sualert("全部查询完成");
+                            progressvalue.textContent = `任务 ${taskname} 查询完成：${parsedData.curpro} / ${parsedData.numpro} 请直接导出`;
+                            window.querydata = parsedData;
+                            break;
+                        }
+                    } catch (error) {
+                        console.log(error);
+                        eralert("任务异常" + error);
+                        break;
+                    }
+                    await new Promise(resolve => setTimeout(resolve, 1500));
+                }
+            }
+            // 立即执行异步函数
+            (async () => {
+                await loop();
+            })();
+        }
+
+        function deletetask() {
+            const taskname = window.taskname;
+            var jsonData = JSON.stringify({ "task": taskname });
+            http('POST', '/delete/task', jsonData)
+                .then(function (data) {
+                    const parsedData = JSON.parse(data);
+                    if (parsedData.code === 200) {
+                        sualert("删除任务成功");
+                        progressvalue.textContent = `任务 ${taskname} 已删除`;
+                        return;
+                    }
+                    if (parsedData.code === 404) {
+                        sualert("删除不存在");
+                        return;
+                    }
+
+                    eralert("删除任务失败");
+                })
+                .catch(function (error) {
+                    eralert(error);
+                    console.log(error);
+                })
+        }
+    </script>
+
+    <!-- 工具封装 -->
+    <script>
+        // 加载框
+        const netload = document.getElementById('netload');
+        // 消息框
+        const alertPlaceholder = document.getElementById('liveAlertPlaceholder');
+        const alert = (message, type) => {
+            const wrapper = document.createElement('div');
+            wrapper.innerHTML = [
+                `<div class="alert alert-${type} alert-dismissible fade show" role="alert">`,
+                `   <div>${message}</div>`,
+                '   <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>',
+                '</div>'
+            ].join('');
+            alertPlaceholder.append(wrapper);
+            setTimeout(() => {
+                const closeButton = wrapper.querySelector('[aria-label="Close"]');
+                closeButton.click();
+            }, 3000);
+        }
+
+        // 封装一下错误消息
+        const eralert = (message) => {
+            alert(message, 'danger');
+        }
+        // 成功消息
+        const sualert = (message) => {
+            alert(message, 'success');
+        }
+
+        // 网络工具包
+        function http(type, url, data, header) {
+            netload.style.display = 'block';
+            return new Promise(function (resolve, reject) {
+                var xhr = new XMLHttpRequest();
+                xhr.open(type, url);
+                if (header) {
+                    xhr.setRequestHeader('Content-Type', 'application/json');
+                }
+                xhr.onload = function () {
+                    if (xhr.status === 200) {
+                        netload.style.display = 'none';
+                        resolve(xhr.responseText); // 将响应文本作为参数传递给 resolve 方法
+                    } else {
+                        netload.style.display = 'none';
+                        reject(new Error(xhr.statusText)); // 创建并返回一个新的 Error 对象
+                    }
+                };
+                xhr.onerror = function () {
+                    netload.style.display = 'none';
+                    reject(new Error("Network Error")); // 创建并返回一个新的 Error 对象
+                };
+                if (!data) {
+                    xhr.send();
+                } else {
+                    xhr.send(data);
+                }
+            });
+        }
+    </script>
+
+    <script>
+        var xlsx = XLSX;
+        function exportData() {
+            // 获取列表元素和所有的列表项元素
+            var listArray = window.querydata.data;
+            var data = [];
+            if (window.querydata.tasktype == "web") {
+
+                // 定义一个空数组，用于保存所有数据
+                data.push(["contentTypeName", "domain", "domainId", "leaderName",
+                    "limitAccess", "mainId", "mainLicence", "natureName",
+                    "serviceId", "serviceLicence", "unitName", "updateRecordTime"]);
+                // 循环遍历列表项元素，将数据添加到数组中
+                listArray.forEach(function (item) {
+                    // 获取文本内容和状态
+                    // 将数据添加到数组中
+                    data.push([item[0].contentTypeName, item[0].domain, item[0].domainId, item[0].leaderName,
+                    item[0].limitAccess, item[0].mainId, item[0].mainLicence, item[0].natureName, item[0].serviceId,
+                    item[0].serviceLicence, item[0].unitName, item[0].updateRecordTime]);
+                });
+            }
+            if (window.querydata.tasktype === "app" || window.querydata.tasktype === "mapp" || window.querydata.tasktype === "kapp") {
+                // 定义一个空数组，用于保存所有数据
+                data.push(["cityId", "countyId", "dataId", "leaderName",
+                    "mainId", "mainLicence", "mainUnitAddress", "mainUnitCertNo",
+                    "mainUnitCertType", "natureId", "natureName", "provinceId",
+                    "serviceId", "serviceLicence", "serviceName", "serviceType",
+                    "unitName", "updateRecordTime", "version"]);
+
+                // 循环遍历列表项元素，将数据添加到数组中
+                listArray.forEach(function (item) {
+                    // 获取文本内容和状态
+                    // 将数据添加到数组中
+                    data.push([item[0].cityId, item[0].countyId, item[0].dataId,
+                    item[0].leaderName, item[0].mainId, item[0].mainLicence, item[0].mainUnitAddress,
+                    item[0].mainUnitCertNo, item[0].mainUnitCertType, item[0].natureId, item[0].natureName,
+                    item[0].provinceId, item[0].serviceId, item[0].serviceLicence, item[0].serviceName, item[0].serviceType,
+                    item[0].unitName, item[0].updateRecordTime, item[0].version]);
+                });
+            }
+
+            if (window.querydata.tasktype === "bapp" || window.querydata.tasktype === "bweb" || window.querydata.tasktype === "bkapp" || window.querydata.tasktype === "bmapp") {
+                // 定义一个空数组，用于保存所有数据
+                data.push(["blacklistLevel", "serviceName"]);
+                // 循环遍历列表项元素，将数据添加到数组中
+                listArray.forEach(function (item) {
+                    // 获取文本内容和状态
+                    // 将数据添加到数组中
+                    data.push([item[0].blacklistLevel, item[0].serviceName]);
+                });
+            }
+            // 定义一个新的工作簿对象
+            var wb = xlsx.utils.book_new();
+
+            // 将数据添加到工作簿中
+            var ws = xlsx.utils.aoa_to_sheet(data);
+            xlsx.utils.book_append_sheet(wb, ws);
+
+            // 生成并下载文件
+            xlsx.writeFile(wb, `${window.taskname}.xlsx`);
+        }
+    </script>
+</body>
+
+</html>
