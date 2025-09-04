@@ -17,6 +17,9 @@ system:
 
 # 打码配置
 captcha:
+  # 是否要启用打码，默认不启用，可以不用打码
+  enable: false
+
   # 保存检测失败的验证码，存放在{save_failed_img_path}
   save_failed_img: false
   # 检测失败的验证码的存放路径

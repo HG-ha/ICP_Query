@@ -153,6 +153,9 @@ class beian:
         self.blackappAndMiniByCondition = "https://hlwicpfwc.miit.gov.cn/icpproject_query/api/blackListDomain/queryByCondition_appAndMini"
         # 新增：APP/小程序/快应用详情查询接口
         self.queryDetailByAppAndMiniId = "https://hlwicpfwc.miit.gov.cn/icpproject_query/api/icpAbbreviateInfo/queryDetailByAppAndMiniId"
+        self.sign = "eyJ0eXBlIjozLCJleHREYXRhIjp7InZhZnljb2RlX2ltYWdlX2tleSI6IjUyZWI1ZTcyODViNzRmNWJhM2YwYzBkNTg0YTg3NmVmIn0sImUiOjE3NTY5NzAyNDg4MjN9.Ngpkwn4T7sQoQF9pCk_sQQpH61wQUEKnK2sQ8hDIq-Q"
+        self.token = ""
+        self.token_expire = 0
         self.det = detnate()
         self.timeout = aiohttp.ClientTimeout(total=config.system.http_client_timeout)
         self.local_ipv6_addresses = get_local_ipv6_addresses() if config.proxy.local_ipv6_pool.enable else []
@@ -169,26 +172,32 @@ class beian:
             return aiohttp.ClientSession(timeout=self.timeout, connector=TCPConnector(ssl=False))
 
     async def get_token(self, proxy=""):
+        base_header = {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/101.0.4951.41 Safari/537.36 Edg/101.0.1210.32",
+                    "Origin": "https://beian.miit.gov.cn",
+                    "Referer": "https://beian.miit.gov.cn/",
+                    "Cookie": f"__jsluid_s=948698cf319a8abdedca50a59c9faf05" if not config.captcha.enable else f"__jsluid_s={await self.get_cookie(proxy)}",
+                    "Accept": "application/json, text/plain, */*",
+                }
+        if self.token_expire > int(time.time() * 1000):
+            return True,self.token,base_header
+        
         timeStamp = round(time.time() * 1000)
         authSecret = "testtest" + str(timeStamp)
         authKey = hashlib.md5(authSecret.encode(encoding="UTF-8")).hexdigest()
         auth_data = {"authKey": authKey, "timeStamp": timeStamp}
-        cookie = await self.get_cookie(proxy)
-        base_header = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/101.0.4951.41 Safari/537.36 Edg/101.0.1210.32",
-            "Origin": "https://beian.miit.gov.cn",
-            "Referer": "https://beian.miit.gov.cn/",
-            "Cookie": f"__jsluid_s={cookie}",
-            "Accept": "application/json, text/plain, */*",
-        }
+        
         try:
             async with await self.get_session(proxy) as session:
                 async with session.post(self.url, data=auth_data, headers=base_header, proxy=proxy if proxy else None) as req:
                     req = await req.text()
+
             if "当前访问疑似黑客攻击" in req:
                 return False,"当前访问已被创宇盾拦截",""
             t = ujson.loads(req)
-            return True,t["params"]["bussiness"], base_header
+            self.token = t["params"]["bussiness"]
+            self.token_expire = int(time.time() * 1000) + t["params"]["expire"]
+            return True,self.token, base_header
         except Exception as e:
             return False,str(e),""
 
@@ -343,14 +352,27 @@ class beian:
         """获取 APP / 小程序 / 快应用 详细信息（复用一次打码验证结果）"""
         info = {"dataId": dataId, "serviceType": serviceType}
         length = str(len(str(ujson.dumps(info, ensure_ascii=False)).encode("utf-8")))
+
         detail_header = base_header.copy()
         detail_header.update({"Content-Length": length, "Uuid": p_uuid, "Token": token, "Sign": sign})
+
+        if not config.captcha.enable:
+            detail_header.pop("Uuid", None)
+            detail_header.pop("Content-Length", None)
+
         async with await self.get_session(proxy) as session:
-            async with session.post(self.queryDetailByAppAndMiniId,
-                                    data=ujson.dumps(info, ensure_ascii=False),
-                                    headers=detail_header,
-                                    proxy=proxy if proxy else None) as req:
-                res = await req.text()
+            if config.captcha.enable:
+                async with session.post(self.queryDetailByAppAndMiniId,
+                                        data=ujson.dumps(info, ensure_ascii=False),
+                                        headers=detail_header,
+                                        proxy=proxy if proxy else None) as req:
+                    res = await req.text()
+            else:
+                async with session.post(f"{self.queryDetailByAppAndMiniId}",
+                                        json=info,
+                                        headers=detail_header,
+                                        proxy=proxy if proxy else None) as req:
+                    res = await req.text()
         return True, ujson.loads(res)
 
     async def getbeian(self, name, sp, pageNum, pageSize, proxy=""):
@@ -358,19 +380,39 @@ class beian:
         info["pageNum"] = pageNum
         info["pageSize"] = pageSize
         info["unitName"] = name
-        success, p_uuid, token, sign, base_header = await self.check_img(proxy)
-        if not success:
-            logger.info(f"打码失败：{p_uuid}")
-            return False, p_uuid
+        if config.captcha.enable:
+            success, p_uuid, token, sign, base_header = await self.check_img(proxy)
+            if not success:
+                logger.info(f"打码失败：{p_uuid}")
+                return False, p_uuid
 
-        length = str(len(str(ujson.dumps(info, ensure_ascii=False)).encode("utf-8")))
-        base_header.update({"Content-Length": length, "Uuid": p_uuid, "Token": token, "Sign": sign})
-        async with await self.get_session(proxy) as session:
-            async with session.post(self.queryByCondition,
-                                    data=ujson.dumps(info, ensure_ascii=False),
-                                    headers=base_header,
-                                    proxy=proxy if proxy else None) as req:
-                res = await req.text()
+            length = str(len(str(ujson.dumps(info, ensure_ascii=False)).encode("utf-8")))
+            base_header.update({"Content-Length": length, "Uuid": p_uuid, "Token": token, "Sign": sign})
+            async with await self.get_session(proxy) as session:
+                async with session.post(self.queryByCondition,
+                                        data=ujson.dumps(info, ensure_ascii=False),
+                                        headers=base_header,
+                                        proxy=proxy if proxy else None) as req:
+                    res = await req.text()
+        else:
+            success,token,base_header = await self.get_token(proxy)
+            sign = ""
+            p_uuid = ""
+            if not success:
+                logger.info(f"获取token失败")
+                return False, None
+            base_header.update({"Token":token,"Sign":self.sign})
+
+            async with await self.get_session(proxy) as session:
+                async with session.post(f"{self.queryByCondition}/",
+                                        json=info,
+                                        headers=base_header,
+                                        proxy=proxy if proxy else None) as req:
+                    res = await req.text()
+
+        if "当前访问疑似黑客攻击" in res:
+            return False,"当前访问已被创宇盾拦截"
+        
         result = ujson.loads(res)
 
         # 并发获取详情（仅 APP / 小程序 / 快应用）
@@ -388,7 +430,7 @@ class beian:
                 try:
                     async with sem:
                         d_success, d_data = await self.getAppAndMiniDetail(
-                            item["dataId"], serviceType, p_uuid, token, sign, base_header, proxy
+                            item["dataId"], serviceType, p_uuid, token, sign if config.captcha.enable else self.sign, base_header, proxy
                         )
                     if d_success and d_data.get("success"):
                         return d_data["params"]
@@ -487,32 +529,11 @@ if __name__ == "__main__":
         a = beian()
         # 官方单页查询pageSize最大支持26
         # 页面索引pageNum从1开始,第一页可以不写
-        data = await a.ymWeb("qq.com")
-        # data = await a.bymKuaiApp("深圳市腾讯计算机系统有限公司")
-        # data = await a.ymApp("应用宝")
+        data = await a.ymWeb("深圳市腾讯计算机系统有限公司")
         print(f"查询结果：\n{data}")
-        # acc = 0
-        # err = 0
-        # for i in range(1000):
-        #     # timeout = aiohttp.ClientTimeout(total=config.system.http_client_timeout)
-        #     # async with aiohttp.ClientSession(timeout=timeout) as session:
-        #     #     async with session.get(config.proxy.extra_api.url) as req:
-        #     #         res = await req.text()
-        #     #         proxy = f"http://{random.choice(res.split('\n')).strip()}"
-        #     data = await a.ymWeb("qq.com")
-        #     print(f"查询结果：\n{data}")
-        #     time.sleep(0.2)
-        #     if data["code"] == 200:
-        #         acc += 1
-        #     else:
-        #         err += 1
-        #     print(f"\n当前成功:{acc}，失败：{err}，成功率：{acc / (acc+err)} \n")
-        #     if acc + err >= 100:
-        #         return
-        # return data
+        data = await a.ymApp("深圳市腾讯计算机系统有限公司")
+        print(f"查询结果：\n{data}")
 
-    # loop = asyncio.get_event_loop()
-    # loop.run_until_complete(main())
     asyncio.run(main())
 
     """
