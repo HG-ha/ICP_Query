@@ -19,15 +19,45 @@ from load_config import config
 import subprocess
 import uuid
 import locale
+import weakref
 
-VERSION="0.6.1"
+VERSION="0.6.2"
 
 pool_cache = TTLCache(maxsize=config.proxy.extra_api.pool_num, 
                       ttl=config.proxy.extra_api.timeout - config.proxy.extra_api.timeout_drop)
 
+# 全局任务管理器
+class TaskManager:
+    def __init__(self):
+        self._tasks = weakref.WeakValueDictionary()
+        self._semaphores = {}
+        
+    def add_task(self, task_name, task):
+        self._tasks[task_name] = task
+        
+    def get_task(self, task_name):
+        return self._tasks.get(task_name)
+        
+    def remove_task(self, task_name):
+        if task_name in self._tasks:
+            task = self._tasks[task_name]
+            if not task.done():
+                task.cancel()
+            del self._tasks[task_name]
+            
+    def get_semaphore(self, name, limit):
+        if name not in self._semaphores:
+            self._semaphores[name] = asyncio.Semaphore(limit)
+        return self._semaphores[name]
+
+task_manager = TaskManager()
+
 def signal_handler(sig, frame):
     if sig == signal.SIGINT:
         logger.warning('收到关闭信号，程序停止')
+        # 清理所有任务
+        for task_name in list(task_manager._tasks.keys()):
+            task_manager.remove_task(task_name)
         sys.exit()
 
 signal.signal(signal.SIGINT, signal_handler)
@@ -143,7 +173,7 @@ async def init_ipv6_pool(app):
         logger.info(f"已配置 {config.proxy.local_ipv6_pool.pool_num - len(public_ipv6_addresses)} 个新的IPv6地址")
     else:
         logger.info("已有足够的IPv6地址，无需配置")
-    app.loop.create_task(check_and_update_ipv6_pool())
+    asyncio.create_task(check_and_update_ipv6_pool())
 
 async def check_and_update_ipv6_pool():
     while True:
@@ -180,11 +210,28 @@ class Pool:
         self.number = config.proxy.extra_api.pool_num
         # 代理池的统一session
         self.session = None
+        # 更新锁，防止并发更新
+        self._update_lock = asyncio.Lock()
         # 启动定时任务，维护地址池
-        asyncio.create_task(self.cron_create())
+        self._update_task = None
+        
+    async def start(self):
+        """启动代理池维护任务"""
+        if self._update_task is None:
+            self._update_task = asyncio.create_task(self.cron_update())
+
+    async def stop(self):
+        """停止代理池维护任务"""
+        if self._update_task:
+            self._update_task.cancel()
+            try:
+                await self._update_task
+            except asyncio.CancelledError:
+                pass
+        await self._close_session()
 
     async def cron_create(self):
-        asyncio.ensure_future(self.cron_update())
+        await self.start()
 
     async def _init_session(self):
         if self.session is None:
@@ -194,71 +241,92 @@ class Pool:
     async def _close_session(self):
         if self.session is not None:
             await self.session.close()
+            self.session = None
 
     # 获取新的代理到代理地址池
     async def _update(self):
-        if len(pool_cache) < self.number:
-            await self._init_session()
-            async with self.session.get(self.proxy_url) as req:
-                res = await req.text()
-                proxy_list = res.split("\n")
-                if len(proxy_list) == 0:
-                    logger.error("提取到的IP为0")
-                    return
-                endtime = datetime.now().timestamp()
-                from aiohttp import TCPConnector
+        async with self._update_lock:
+            if len(pool_cache) >= self.number:
+                logger.info(f"代理池饱满，无需更新代理，当前池内数量：{len(pool_cache)}")
+                return
                 
-                if config.proxy.extra_api.check_proxy:
-                    timeout = aiohttp.ClientTimeout(total=config.proxy.extra_api.proxy_timeout)
-                    async def process_app(address):
-                        try:
-                            async with aiohttp.ClientSession(
-                                timeout=timeout, connector=TCPConnector(ssl=False)
-                            ) as session:
-                                async with session.get(
-                                    "http://ifconfig.me/ip",proxy=f"http://{address}"
-                                ) as req:
-                                    res = await req.text()
+            try:
+                await self._init_session()
+                async with self.session.get(self.proxy_url) as req:
+                    res = await req.text()
+                    proxy_list = [p.strip() for p in res.split("\n") if p.strip()]
+                    
+                    if len(proxy_list) == 0:
+                        logger.error("提取到的IP为0")
+                        return
+                        
+                    endtime = datetime.now().timestamp()
+                    
+                    if config.proxy.extra_api.check_proxy:
+                        await self._check_and_add_proxies(proxy_list, endtime)
+                    else:
+                        for address in proxy_list:
                             if len(pool_cache) >= self.number:
-                                pool_cache.popitem()
+                                break
                             pool_cache[address] = endtime
-                            logger.info(f"入库代理成功：{address}")
-                        except:
-                            logger.info(f"入库检测代理不可用：{address}")
+                            
+                    logger.info(f"更新代理池成功，当前代理数量：{len(pool_cache)}")
+                    
+            except Exception as e:
+                logger.error(f"更新代理池失败: {e}")
 
-                    async def limit_concurrent_tasks(tasks, limit):
-                        semaphore = asyncio.Semaphore(limit)
-
-                        async def _sem_task(task):
-                            async with semaphore:
-                                return await task
-
-                        return await asyncio.gather(*[_sem_task(task) for task in tasks])
-
-                    tasks = [process_app(address) for address in proxy_list]
-                    await limit_concurrent_tasks(tasks,config.proxy.extra_api.check_proxy_num)
-                else:
-                    for address in proxy_list:
-                        if len(pool_cache) >= self.number:
-                            pool_cache.popitem()
+    async def _check_and_add_proxies(self, proxy_list, endtime):
+        """并发检查代理可用性并添加到池中"""
+        semaphore = asyncio.Semaphore(config.proxy.extra_api.check_proxy_num)
+        
+        async def check_proxy(address):
+            async with semaphore:
+                if len(pool_cache) >= self.number:
+                    return
+                    
+                timeout = aiohttp.ClientTimeout(total=config.proxy.extra_api.proxy_timeout)
+                try:
+                    from aiohttp import TCPConnector
+                    async with aiohttp.ClientSession(
+                        timeout=timeout, connector=TCPConnector(ssl=False)
+                    ) as session:
+                        async with session.get(
+                            "http://ifconfig.me/ip", proxy=f"http://{address}"
+                        ) as req:
+                            await req.text()
+                    
+                    if len(pool_cache) < self.number:
                         pool_cache[address] = endtime
-                logger.info(f"更新代理池成功，当前代理数量：{len(pool_cache)}")
-        else:
-            logger.info(f"代理池饱满，无需更新代理，当前池内数量：{len(pool_cache)}")
+                        logger.info(f"入库代理成功：{address}")
+                except Exception:
+                    logger.info(f"入库检测代理不可用：{address}")
+
+        # 使用asyncio.gather处理并发任务，添加异常处理
+        tasks = [check_proxy(address) for address in proxy_list]
+        await asyncio.gather(*tasks, return_exceptions=True)
 
     # 定时任务,更新地址池
     async def cron_update(self):
-        while True:
-            asyncio.ensure_future(self._update())
-            await asyncio.sleep(self.period)
+        try:
+            while True:
+                await self._update()
+                await asyncio.sleep(self.period)
+        except asyncio.CancelledError:
+            logger.info("代理池更新任务已取消")
+            raise
 
-    async def getproxy(self,num=1):
-        # 由于不同用户提取间隔的配置
-        # 需确保本地资源池中缓存了代理
+    async def getproxy(self, num=1):
+        # 等待代理池有可用代理
+        timeout = 30  # 30秒超时
+        start_time = asyncio.get_event_loop().time()
+        
         while True:
             if len(pool_cache) != 0:
                 break
+            if asyncio.get_event_loop().time() - start_time > timeout:
+                raise TimeoutError("等待代理超时")
             await asyncio.sleep(0.1)
+            
         random_key = f"http://{random.choice(list(pool_cache.keys()))}"
         return random_key
 
@@ -311,96 +379,105 @@ async def options_middleware(app, handler):
 
 # 创建任务队列
 async def create_task(taskname, data, request, searnum, apptype="web"):
-    task = request.app["tasks"].get(taskname)
-    task.curpro = 0
-    task.numpro = len(data)
-    task.domains = []
-    task.appname = apptype
+    task = type('Task', (), {
+        'curpro': 0,
+        'numpro': len(data),
+        'domains': [],
+        'appname': apptype,
+        'cancelled': False
+    })()
+    
+    request.app["tasks"][taskname] = task
 
-    async def process_app(taskname, appname, request):
-        error_retry_times = 0
-        while error_retry_times < config.captcha.retry_times:
-            error_retry_times += 1
-            if taskname not in request.app["tasks"]:
-                logger.info(f"任务 {taskname} 结束，退出队列")
+    async def process_app(appname, semaphore):
+        async with semaphore:
+            if task.cancelled:
                 return
+                
+            error_retry_times = 0
+            while error_retry_times < config.captcha.retry_times:
+                if task.cancelled:
+                    return
+                    
+                error_retry_times += 1
+                proxy = None
+                
+                try:
+                    # 获取代理逻辑
+                    if config.proxy.local_ipv6_pool.enable:
+                        proxy = ""
+                    elif config.proxy.tunnel.url and is_valid_url(config.proxy.tunnel.url):
+                        proxy = config.proxy.tunnel.url
+                        logger.info(f"使用隧道代理：{proxy}")
+                    elif config.proxy.extra_api.url and is_valid_url(config.proxy.extra_api.url):
+                        if config.proxy.extra_api.auto_maintenace:
+                            proxy = await request.app.proxypool.getproxy()
+                            logger.info(f"从本地地址池获得代理：{proxy}")
+                        else:
+                            timeout = aiohttp.ClientTimeout(total=config.system.http_client_timeout)
+                            async with aiohttp.ClientSession(timeout=timeout) as session:
+                                async with session.get(config.proxy.extra_api.url) as req:
+                                    res = await req.text()
+                                    proxy = f"http://{random.choice(res.split()).strip()}"
+                            logger.info(f"从代理提取接口获得代理：{proxy}")
 
-            proxy = None
-            if config.proxy.local_ipv6_pool.enable:
-                proxy = ""
+                    # 执行查询
+                    data = await appth.get(apptype)(appname, proxy=proxy)
 
-            elif not proxy and config.proxy.tunnel.url:
-                if is_valid_url(config.proxy.tunnel.url):
-                    proxy = config.proxy.tunnel.url
-                    logger.info(f"使用隧道代理：{proxy}")
-                else:
-                    logger.error(f"当前启用隧道代理，但代理地址无效：{config.proxy.tunnel.url}")
-                    break
+                    # 处理响应
+                    if data["code"] == 500:
+                        if "请求验证码时失败" in data.get("message", ''):
+                            if proxy and proxy[7:] in pool_cache:
+                                del pool_cache[proxy[7:]]
+                                logger.info(f"代理无效，已剔除代理：{proxy[7:]}")
 
-            elif not proxy and config.proxy.extra_api.url:
-                if is_valid_url(config.proxy.extra_api.url):
-                    if config.proxy.extra_api.auto_maintenace:
-                        proxy = await request.app.proxypool.getproxy()
-                        logger.info(f"从本地地址池获得代理：{proxy}")
-                    else:
-                        timeout = aiohttp.ClientTimeout(total=config.system.http_client_timeout)
-                        async with aiohttp.ClientSession(timeout=timeout) as session:
-                            async with session.get(config.proxy.extra_api.url) as req:
-                                res = await req.text()
-                                proxy = f"http://{random.choice(res.split()).strip()}"
-                        logger.info(f"从代理提取接口获得代理：{proxy}")
-                else:
-                    logger.error(f"当前启用API提取代理，但API地址无效：{config.proxy.extra_api.url}")
-                    break
+                        if data.get("message", "") == "当前访问已被创宇盾拦截":
+                            logger.warning(f"当前访问已被创宇盾拦截，批量任务：{taskname}，使用代理：{proxy}")
 
-            data = await appth.get(apptype)(appname, proxy=proxy)
+                    if data["code"] == 200:
+                        task.curpro += 1
+                        # 处理返回数据
+                        if len(data["params"]["list"]) == 0:
+                            if apptype == "web":
+                                result_data = [{"contentTypeName": None, "domain": appname, "domainId": None, "leaderName": None,
+                                         "limitAccess": None, "mainId": None, "mainLicence": None, "natureName": None,
+                                         "serviceId": None, "serviceLicence": None, "unitName": None, "updateRecordTime": None}]
+                            elif apptype in ["app", "mapp", "kapp"]:
+                                result_data = [{"cityId": None, "countyId": None, "dataId": None, "leaderName": None,
+                                         "mainId": None, "mainLicence": None, "mainUnitAddress": None, "mainUnitCertNo": None,
+                                         "mainUnitCertType": None, "natureId": None, "natureName": None, "provinceId": None,
+                                         "serviceId": None, "serviceLicence": None, "serviceName": appname, "serviceType": None,
+                                         "unitName": None, "updateRecordTime": None, "version": None}]
+                            else:
+                                result_data = [{'blacklistLevel': None, 'serviceName': appname}]
+                            task.domains.append(result_data)
+                        else:
+                            if apptype in ["bapp", "bweb", 'bkapp', 'bmapp']:
+                                task.domains.append(data["params"])
+                            else:
+                                task.domains.append(data["params"]["list"])
+                        break
+                        
+                except Exception as e:
+                    logger.error(f"处理任务 {appname} 时发生异常: {e}")
+                    
+            if error_retry_times >= config.captcha.retry_times:
+                logger.warning(f"任务 {appname} 达到最大尝试次数 {config.captcha.retry_times}，仍未成功完成")
 
-            if data["code"] == 500:
-                if "请求验证码时失败" in data.get("message", ''):
-                    if proxy and proxy[7:] in pool_cache:
-                        del pool_cache[proxy[7:]]
-                        logger.info(f"代理无效，已剔除代理：{proxy[7:]}")
-
-                if data.get("message", "") == "当前访问已被创宇盾拦截":
-                    logger.warning(f"当前访问已被创宇盾拦截，批量任务：{taskname}，使用代理：{proxy}")
-
-            if data["code"] == 200:
-                task.curpro += 1
-                if len(data["params"]["list"]) == 0:
-                    if apptype == "web":
-                        data = [{"contentTypeName": None, "domain": appname, "domainId": None, "leaderName": None,
-                                 "limitAccess": None, "mainId": None, "mainLicence": None, "natureName": None,
-                                 "serviceId": None, "serviceLicence": None, "unitName": None, "updateRecordTime": None}]
-                    elif apptype in ["app", "mapp", "kapp"]:
-                        data = [{"cityId": None, "countyId": None, "dataId": None, "leaderName": None,
-                                 "mainId": None, "mainLicence": None, "mainUnitAddress": None, "mainUnitCertNo": None,
-                                 "mainUnitCertType": None, "natureId": None, "natureName": None, "provinceId": None,
-                                 "serviceId": None, "serviceLicence": None, "serviceName": appname, "serviceType": None,
-                                 "unitName": None, "updateRecordTime": None, "version": None}]
-                    else:
-                        data = [{'blacklistLevel': None, 'serviceName': appname}]
-                    task.domains.append(data)
-                else:
-                    if apptype in ["bapp", "bweb", 'bkapp', 'bmapp']:
-                        task.domains.append(data["params"])
-                    else:
-                        task.domains.append(data["params"]["list"])
-                break
-
-        if error_retry_times >= config.captcha.retry_times:
-            logger.warning(f"任务 {taskname} 达到最大尝试次数 {config.captcha.retry_times}，仍未成功完成")
-
-    async def limit_concurrent_tasks(tasks, limit):
-        semaphore = asyncio.Semaphore(limit)
-
-        async def _sem_task(task):
-            async with semaphore:
-                return await task
-
-        return await asyncio.gather(*[_sem_task(task) for task in tasks])
-
-    tasks = [process_app(taskname, appname, request) for appname in data]
-    await limit_concurrent_tasks(tasks, searnum)
+    # 使用信号量限制并发数
+    semaphore = asyncio.Semaphore(searnum)
+    tasks = [process_app(appname, semaphore) for appname in data]
+    
+    try:
+        await asyncio.gather(*tasks, return_exceptions=True)
+    except Exception as e:
+        logger.error(f"批量任务 {taskname} 执行失败: {e}")
+    finally:
+        # 任务完成后清理
+        if taskname in request.app["tasks"]:
+            # del request.app["tasks"][taskname]
+            task = request.app["tasks"][taskname]
+            task.completed = True
 
 # 查询任务进度
 @jsondump
@@ -437,7 +514,7 @@ async def create_task_catch(request):
         if seartype not in config.risk_avoidance.allow_type:
             return wj({"code": 405,"message":"不支持的查询类型"})
         
-        if len(data) == 0:
+        if len(domains) == 0:
             return wj({"code":400,"message":"提交的查询列表为空"})
         
         domains = [s for s in domains if not any(s.endswith(end) for end in config.risk_avoidance.prohibit_suffix)]
@@ -446,26 +523,40 @@ async def create_task_catch(request):
             return wj({"code":400,"message":"在剔除不允许查询的内容后，列表为空，取消任务"})
         
         searnum = int(data.get("searnum", 20))
-        task = asyncio.create_task(create_task(
-            taskname, domains, request, searnum, seartype))
         
-        request.app["tasks"][taskname] = task
+        # 检查是否已存在同名任务
+        if taskname in request.app["tasks"]:
+            return wj({"code": 409, "message": "任务已存在"})
+        
+        # 创建异步任务
+        task_coroutine = create_task(taskname, domains, request, searnum, seartype)
+        async_task = asyncio.create_task(task_coroutine)
+        
+        # 添加任务到管理器
+        task_manager.add_task(taskname, async_task)
+        
         logger.info(f"创建批量查询任务：{taskname}")
-
         return wj({"code": 200,"message":"创建任务成功"})
 
 # 删除批量查询任务
 @jsondump
 @routes.view(r"/delete/task")
 async def del_task(request):
-
     if request.method == "POST":
         data = await request.json()
         taskname = data.get("task")
+        
         if taskname in request.app["tasks"]:
+            # 标记任务为取消状态
             task = request.app["tasks"][taskname]
-            task.cancel()
+            task.cancelled = True
+            
+            # 从任务管理器中移除
+            task_manager.remove_task(taskname)
+            
+            # 从应用任务字典中删除
             del request.app["tasks"][taskname]
+            
             logger.warning(f"删除批量查询任务：{taskname}")
             return wj({"code": 200})
         else:
@@ -476,7 +567,10 @@ async def del_task(request):
 async def geturl(request):
     path = request.match_info['path']
 
-    if path not in appth or path not in config.risk_avoidance.allow_type:
+    if path not in appth and path not in bappth:
+        return wj({"code":102,"msg":"不是支持的查询类型"})
+
+    if path not in config.risk_avoidance.allow_type:
         return wj({"code":102,"msg":"不是支持的查询类型"})
     
     if request.method == "GET":
@@ -537,7 +631,11 @@ async def geturl(request):
             else:
                 logger.error(f"当前启用API提取代理，但API地址无效：{config.proxy.extra_api.url}")
                 return wj({"code":500,"message":"当前启用API提取代理，但API地址无效"})
-        data = await appth.get(path)(appname, pageNum, pageSize, proxy=proxy)
+        if path in appth:
+            data = await appth.get(path)(appname, pageNum, pageSize, proxy=proxy)
+        else:
+            data = await bappth.get(path)(appname, proxy=proxy)
+
         if data.get("code", 500) == 200:
             return wj(data)
         if data.get("message", "") == "当前访问已被创宇盾拦截":
@@ -554,8 +652,13 @@ if config.system.web_ui:
 async def init_proxy_pool(app):
     if not hasattr(app, "proxypool"):
         app.proxypool = Pool()
+        await app.proxypool.start()
         logger.info("初始化地址池维护任务")
 
+async def cleanup_proxy_pool(app):
+    if hasattr(app, "proxypool"):
+        await app.proxypool.stop()
+        logger.info("清理地址池维护任务")
 
 if __name__ == "__main__":
 
@@ -579,7 +682,6 @@ if __name__ == "__main__":
 
     if config.proxy.local_ipv6_pool.enable:
         app.on_startup.append(init_ipv6_pool)
-
     elif config.proxy.tunnel.url is None:
         if config.proxy.extra_api.url is not None:
             if is_valid_url(config.proxy.extra_api.url):
@@ -589,18 +691,33 @@ if __name__ == "__main__":
                             f"超时时间：{config.proxy.extra_api.timeout} 秒 ，"
                             f"提前丢弃：{config.proxy.extra_api.timeout_drop} 秒 ")
                     app.on_startup.append(init_proxy_pool)
+                    app.on_cleanup.append(cleanup_proxy_pool)
             else:
                 logger.warning("当前启用了API提取代理，但该地址似乎无效，将不使用该代理")
-
-    
 
     aiohttp_jinja2.setup(app, loader=jinja2.FileSystemLoader(get_resource_path("templates")))
     app.add_routes(routes)
     app["tasks"] = {}
 
+    print('''
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃                      🎗️  赞助商                           ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+┌──────────────────────────────────────────────────────────┐
+│  ☁️  林枫云                                               │
+│  ├─ 企业级业务云、专业高频游戏云提供商                   │
+│  └─ 🌐 https://www.dkdun.cn                              │
+└──────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│  🚀  ANT PING                                            │
+│  ├─ 一站式网络检测工具                                   │
+│  └─ 🌐 https://antping.com                               │
+└──────────────────────────────────────────────────────────┘
+''')
+    
     app.middlewares.append(options_middleware)
     if config.system.web_ui:
         print(f"\nweb ui: http://{config.system.host}:{config.system.port}\n\n"
               "按两次 Ctrl + C 可以退出程序\n")
-    
+
     web.run_app(app, host=config.system.host, port=config.system.port)

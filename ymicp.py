@@ -20,32 +20,12 @@ warnings.filterwarnings("ignore", category=UserWarning)
 import ssl
 import subprocess
 import locale
-
+from contextlib import asynccontextmanager
+import threading
+from load_config import config
+from cachetools import TTLCache
 ssl._create_default_https_context = ssl._create_unverified_context()
 
-import yaml
-
-class Config:
-    def __init__(self, **kwargs):
-        for key, value in kwargs.items():
-            # 如果值是字典，则递归转换为对象
-            if isinstance(value, dict):
-                value = Config(**value)
-            setattr(self, key, value)
-
-    def __repr__(self):
-        return str(self.__dict__)
-    
-    def __getattr__(self, name):
-        return None
-
-def load_config(file_path):
-    with open(file_path, 'r', encoding='utf-8') as file:
-        data = yaml.safe_load(file)
-
-    return Config(**data)
-
-config = load_config('config.yml')
 
 def is_public_ipv6(ipv6):
     return not (ipv6.startswith("fe80") or ipv6.startswith("fc00") or ipv6.startswith("fd00"))
@@ -151,36 +131,119 @@ class beian:
         self.blackqueryByCondition = "https://hlwicpfwc.miit.gov.cn/icpproject_query/api/blackListDomain/queryByCondition"
         # 违法违规APP,小程序,快应用
         self.blackappAndMiniByCondition = "https://hlwicpfwc.miit.gov.cn/icpproject_query/api/blackListDomain/queryByCondition_appAndMini"
-        # 新增：APP/小程序/快应用详情查询接口
+        # APP/小程序/快应用详情查询接口
         self.queryDetailByAppAndMiniId = "https://hlwicpfwc.miit.gov.cn/icpproject_query/api/icpAbbreviateInfo/queryDetailByAppAndMiniId"
         self.sign = "eyJ0eXBlIjozLCJleHREYXRhIjp7InZhZnljb2RlX2ltYWdlX2tleSI6IjUyZWI1ZTcyODViNzRmNWJhM2YwYzBkNTg0YTg3NmVmIn0sImUiOjE3NTY5NzAyNDg4MjN9.Ngpkwn4T7sQoQF9pCk_sQQpH61wQUEKnK2sQ8hDIq-Q"
         self.token = ""
         self.token_expire = 0
         self.det = detnate()
-        self.timeout = aiohttp.ClientTimeout(total=config.system.http_client_timeout)
-        self.local_ipv6_addresses = get_local_ipv6_addresses() if config.proxy.local_ipv6_pool.enable else []
+        self.timeout = aiohttp.ClientTimeout(total=getattr(getattr(config, 'system', object()), 'http_client_timeout', 30))
+        self.local_ipv6_addresses = get_local_ipv6_addresses() if getattr(getattr(getattr(config, 'proxy', object()), 'local_ipv6_pool', object()), 'enable', False) else []
+        self.ipv6_index = 0
+        
+        self._ipv6_lock = threading.Lock()  # IPv6轮询锁
+        
+        # 连接池配置
+        self.connector_config = {
+            'limit': 100,
+            'limit_per_host': 30,
+            'ttl_dns_cache': 300,
+            'use_dns_cache': True,
+            'ssl': False,
+            'keepalive_timeout': 30
+        }
 
-    async def get_session(self, proxy=""):
-        if proxy:
-            return aiohttp.ClientSession(timeout=self.timeout, connector=TCPConnector(ssl=False))
-        elif self.local_ipv6_addresses:
+        self._blocked_ip_cache = TTLCache(maxsize=1000, ttl=300)
+        self._blocked_ip_lock = threading.Lock()
+
+
+    def _add_blocked_ip(self, ip):
+        """将IP添加到黑名单缓存"""
+        if not ip:
+            return
+        with self._blocked_ip_lock:
+            self._blocked_ip_cache[ip] = True
+            logger.info(f"IP {ip} 被创宇盾拦截已添加到黑名单缓存，5分钟后恢复使用")
+
+    def _is_ip_blocked(self, ip):
+        """检查IP是否在黑名单缓存中"""
+        if not ip:
+            return False
+        with self._blocked_ip_lock:
+            return ip in self._blocked_ip_cache
+        
+    def _get_next_ipv6(self):
+        """线程安全的IPv6轮询，跳过被拦截的IP"""
+        if not self.local_ipv6_addresses:
+            return None
+        
+        with self._ipv6_lock:
+            attempts = 0
+            max_attempts = len(self.local_ipv6_addresses) * 2  # 最多尝试两轮
             
-            local_ipv6 = random.choice(self.local_ipv6_addresses)
-            connector = TCPConnector(ssl=False, local_addr=(local_ipv6, 0))
-            return aiohttp.ClientSession(timeout=self.timeout, connector=connector)
+            while attempts < max_attempts:
+                if self.ipv6_index >= len(self.local_ipv6_addresses):
+                    self.ipv6_index = 0
+                
+                ipv6 = self.local_ipv6_addresses[self.ipv6_index]
+                self.ipv6_index += 1
+                attempts += 1
+                
+                # 检查IP是否被拦截
+                if not self._is_ip_blocked(ipv6):
+                    return ipv6
+                else:
+                    logger.debug(f"跳过被拦截的IPv6地址: {ipv6}")
+            
+            logger.warning("所有IPv6地址都被拦截，暂无可用地址")
+            return None
+
+    async def _get_connector(self, local_ipv6=None):
+        if local_ipv6:
+            connector = TCPConnector(
+                local_addr=(local_ipv6, 0),
+                **self.connector_config
+            )
         else:
-            return aiohttp.ClientSession(timeout=self.timeout, connector=TCPConnector(ssl=False))
+            connector = TCPConnector(**self.connector_config)
+        
+        return connector
+
+    @asynccontextmanager
+    async def get_session(self, proxy=""):
+        local_ipv6 = None
+        if not proxy and self.local_ipv6_addresses:
+            local_ipv6 = self._get_next_ipv6()
+            if local_ipv6:
+                logger.info(f"使用本地IPv6地址: {local_ipv6}")
+        
+        # 为每个session创建独立的连接器
+        connector = await self._get_connector(local_ipv6)
+        
+        session = aiohttp.ClientSession(
+            timeout=self.timeout,
+            connector=connector,
+            headers={'Connection': 'keep-alive'}
+        )
+        
+        try:
+            yield session
+        finally:
+            # 确保session和connector都被正确关闭
+            await session.close()
+            await connector.close()
 
     async def get_token(self, proxy=""):
         base_header = {
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/101.0.4951.41 Safari/537.36 Edg/101.0.1210.32",
-                    "Origin": "https://beian.miit.gov.cn",
-                    "Referer": "https://beian.miit.gov.cn/",
-                    "Cookie": f"__jsluid_s=948698cf319a8abdedca50a59c9faf05" if not config.captcha.enable else f"__jsluid_s={await self.get_cookie(proxy)}",
-                    "Accept": "application/json, text/plain, */*",
-                }
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/101.0.4951.41 Safari/537.36 Edg/101.0.1210.32",
+            "Origin": "https://beian.miit.gov.cn",
+            "Referer": "https://beian.miit.gov.cn/",
+            "Cookie": f"__jsluid_s={uuid.uuid4().hex}",
+            "Accept": "application/json, text/plain, */*",
+        }
+        
         if self.token_expire > int(time.time() * 1000):
-            return True,self.token,base_header
+            return True, self.token, base_header
         
         timeStamp = round(time.time() * 1000)
         authSecret = "testtest" + str(timeStamp)
@@ -188,18 +251,35 @@ class beian:
         auth_data = {"authKey": authKey, "timeStamp": timeStamp}
         
         try:
-            async with await self.get_session(proxy) as session:
+            async with self.get_session(proxy) as session:
+                current_ip = None
+                if hasattr(session, '_connector') and hasattr(session._connector, '_local_addr'):
+                    current_ip = session._connector._local_addr[0] if session._connector._local_addr else None
                 async with session.post(self.url, data=auth_data, headers=base_header, proxy=proxy if proxy else None) as req:
-                    req = await req.text()
+                    req_text = await req.text()
 
-            if "当前访问疑似黑客攻击" in req:
-                return False,"当前访问已被创宇盾拦截",""
-            t = ujson.loads(req)
-            self.token = t["params"]["bussiness"]
-            self.token_expire = int(time.time() * 1000) + t["params"]["expire"]
-            return True,self.token, base_header
+            if "当前访问疑似黑客攻击" in req_text:
+                if current_ip:
+                    self._add_blocked_ip(current_ip)
+                elif not proxy and self.local_ipv6_addresses:
+                    # 如果无法直接获取IP，使用当前轮询的IPv6
+                    with self._ipv6_lock:
+                        blocked_index = (self.ipv6_index - 1) % len(self.local_ipv6_addresses)
+                        blocked_ip = self.local_ipv6_addresses[blocked_index]
+                        self._add_blocked_ip(blocked_ip)
+                return False, "当前访问已被创宇盾拦截", ""
+            
+            t = ujson.loads(req_text)
+            token = t["params"]["bussiness"]
+            expire = int(time.time() * 1000) + t["params"]["expire"]
+            
+            self.token = token
+            self.token_expire = expire
+            
+            return True, token, base_header
         except Exception as e:
-            return False,str(e),""
+            logger.warning(f"get_token Faile : {e}")
+            return False, str(e), ""
 
     async def get_cookie(self, proxy=""):
         async with await self.get_session(proxy) as session:
@@ -214,7 +294,6 @@ class beian:
         ciphertext_base64 = base64.b64encode(ciphertext)
         return ciphertext_base64.decode("utf-8")
 
-    # 新增的UID加密生成算法
     def get_clientUid(self):
         characters = "0123456789abcdef"
         unique_id = ["0"] * 36
@@ -242,7 +321,7 @@ class beian:
             base_header.update({"Content-Length": length, "Token": token})
             base_header["Content-Type"] = "application/json"
             try:
-                async with await self.get_session(proxy) as session:
+                async with self.get_session(proxy) as session:
                     async with session.post(self.getCheckImage, data=data, headers=base_header, proxy=proxy if proxy else None) as req:
                         res = await req.json()
             except Exception as e:
@@ -274,14 +353,15 @@ class beian:
             )
             length = str(len(str(data).encode("utf-8")))
             base_header.update({"Content-Length": length})
-            async with await self.get_session(proxy) as session:
+            async with self.get_session(proxy) as session:
                 async with session.post(self.checkImage, json=data, headers=base_header, proxy=proxy if proxy else None) as req:
                     res = await req.text()
             data = ujson.loads(res)
             if data["success"] == False:
-                if config.captcha.save_failed_img:
-                    folder_paths = [f'{config.captcha.save_failed_img_path}/ibig',
-                                     f'{config.captcha.save_failed_img_path}/isma']
+                captcha_config = getattr(config, 'captcha', object())
+                if getattr(captcha_config, 'save_failed_img', False):
+                    save_path = getattr(captcha_config, 'save_failed_img_path', './failed_captcha')
+                    folder_paths = [f'{save_path}/ibig', f'{save_path}/isma']
                     for folder in folder_paths:
                         os.makedirs(folder, exist_ok=True)
 
@@ -294,8 +374,8 @@ class beian:
                     )
                     
                     filename = f"{uuid.uuid4()}.jpg"
-                    isma_image_name = f"{config.captcha.save_failed_img_path}/isma/{filename}"
-                    ibig_image_name = f"{config.captcha.save_failed_img_path}/ibig/{filename}"
+                    isma_image_name = f"{save_path}/isma/{filename}"
+                    ibig_image_name = f"{save_path}/ibig/{filename}"
                     logger.info(f"保存到：{isma_image_name}，{ibig_image_name}")
                     cv2.imwrite(isma_image_name,isma)
                     cv2.imwrite(ibig_image_name,ibig)
@@ -317,7 +397,8 @@ class beian:
             np.frombuffer(base64.b64decode(big_image), np.uint8), cv2.COLOR_GRAY2RGB
         )
 
-        if config.captcha.coding_code == 'labour':
+        captcha_config = getattr(config, 'captcha', object())
+        if getattr(captcha_config, 'coding_code', 'auto') == 'labour':
             def mouse_callback(event, x, y, flags, param):
                 if event == cv2.EVENT_LBUTTONDOWN:
                     data.append({"x":x,"y":y})
@@ -348,20 +429,21 @@ class beian:
             success,data = self.det.check_target(ibig, isma)
             return success,data
 
-    async def getAppAndMiniDetail(self, dataId, serviceType, p_uuid, token, sign, base_header, proxy=""):
-        """获取 APP / 小程序 / 快应用 详细信息（复用一次打码验证结果）"""
+    async def getAppAndMiniDetail(self, dataId, serviceType, p_uuid, token, sign, base_header, proxy="", session=None):
+        """优化的详情获取，移除会话复用"""
         info = {"dataId": dataId, "serviceType": serviceType}
         length = str(len(str(ujson.dumps(info, ensure_ascii=False)).encode("utf-8")))
 
         detail_header = base_header.copy()
         detail_header.update({"Content-Length": length, "Uuid": p_uuid, "Token": token, "Sign": sign})
 
-        if not config.captcha.enable:
+        if not getattr(getattr(config, 'captcha', object()), 'enable', False):
             detail_header.pop("Uuid", None)
             detail_header.pop("Content-Length", None)
 
-        async with await self.get_session(proxy) as session:
-            if config.captcha.enable:
+        # 优先使用传入的会话，否则创建新会话
+        if session:
+            if getattr(getattr(config, 'captcha', object()), 'enable', False):
                 async with session.post(self.queryDetailByAppAndMiniId,
                                         data=ujson.dumps(info, ensure_ascii=False),
                                         headers=detail_header,
@@ -373,6 +455,20 @@ class beian:
                                         headers=detail_header,
                                         proxy=proxy if proxy else None) as req:
                     res = await req.text()
+        else:
+            async with self.get_session(proxy) as session:
+                if getattr(getattr(config, 'captcha', object()), 'enable', False):
+                    async with session.post(self.queryDetailByAppAndMiniId,
+                                            data=ujson.dumps(info, ensure_ascii=False),
+                                            headers=detail_header,
+                                            proxy=proxy if proxy else None) as req:
+                        res = await req.text()
+                else:
+                    async with session.post(f"{self.queryDetailByAppAndMiniId}",
+                                            json=info,
+                                            headers=detail_header,
+                                            proxy=proxy if proxy else None) as req:
+                        res = await req.text()
         return True, ujson.loads(res)
 
     async def getbeian(self, name, sp, pageNum, pageSize, proxy=""):
@@ -380,7 +476,8 @@ class beian:
         info["pageNum"] = pageNum
         info["pageSize"] = pageSize
         info["unitName"] = name
-        if config.captcha.enable:
+        
+        if getattr(getattr(config, 'captcha', object()), 'enable', False):
             success, p_uuid, token, sign, base_header = await self.check_img(proxy)
             if not success:
                 logger.info(f"打码失败：{p_uuid}")
@@ -388,22 +485,26 @@ class beian:
 
             length = str(len(str(ujson.dumps(info, ensure_ascii=False)).encode("utf-8")))
             base_header.update({"Content-Length": length, "Uuid": p_uuid, "Token": token, "Sign": sign})
-            async with await self.get_session(proxy) as session:
+            
+            async with self.get_session(proxy) as session:
                 async with session.post(self.queryByCondition,
                                         data=ujson.dumps(info, ensure_ascii=False),
                                         headers=base_header,
                                         proxy=proxy if proxy else None) as req:
                     res = await req.text()
         else:
-            success,token,base_header = await self.get_token(proxy)
+            success, token, base_header = await self.get_token(proxy)
             sign = ""
             p_uuid = ""
             if not success:
                 logger.info(f"获取token失败")
                 return False, None
-            base_header.update({"Token":token,"Sign":self.sign})
+            base_header.update({"Token": token, "Sign": self.sign})
 
-            async with await self.get_session(proxy) as session:
+            async with self.get_session(proxy) as session:
+                current_ip = None
+                if hasattr(session, '_connector') and hasattr(session._connector, '_local_addr'):
+                    current_ip = session._connector._local_addr[0] if session._connector._local_addr else None
                 async with session.post(f"{self.queryByCondition}/",
                                         json=info,
                                         headers=base_header,
@@ -411,27 +512,51 @@ class beian:
                     res = await req.text()
 
         if "当前访问疑似黑客攻击" in res:
-            return False,"当前访问已被创宇盾拦截"
+            if current_ip:
+                self._add_blocked_ip(current_ip)
+            elif not proxy and self.local_ipv6_addresses:
+                # 如果无法直接获取IP，使用当前轮询的IPv6
+                with self._ipv6_lock:
+                    blocked_index = (self.ipv6_index - 1) % len(self.local_ipv6_addresses)
+                    blocked_ip = self.local_ipv6_addresses[blocked_index]
+                    self._add_blocked_ip(blocked_ip)
+            return False, "当前访问已被创宇盾拦截"
         
         result = ujson.loads(res)
 
-        # 并发获取详情（仅 APP / 小程序 / 快应用）
+        # 并发详情获取
         if (sp in (1, 2, 3)
             and result.get("success")
             and result.get("params", {}).get("list")):
+            
             items = result["params"]["list"]
+            if not items:
+                return True, result
+                
             logger.info(f"需要并发获取详细信息数量: {len(items)}")
-            sem = asyncio.Semaphore(getattr(getattr(config, "system", object()), "detail_concurrency", 5))
-
+            
+            # 使用现有的detail_concurrency配置，默认值5
+            max_concurrency = min(
+                getattr(getattr(config, "system", object()), "detail_concurrency", 5),
+                len(items),
+                20  # 最大并发限制
+            )
+            sem = asyncio.Semaphore(max_concurrency)
+            
             async def fetch_detail(item):
                 if "dataId" not in item:
                     return item
+                    
                 serviceType = 6 if sp == 1 else (7 if sp == 2 else 8)
                 try:
                     async with sem:
+                        # 每个详情请求使用独立会话
                         d_success, d_data = await self.getAppAndMiniDetail(
-                            item["dataId"], serviceType, p_uuid, token, sign if config.captcha.enable else self.sign, base_header, proxy
+                            item["dataId"], serviceType, p_uuid, token, 
+                            sign if getattr(getattr(config, 'captcha', object()), 'enable', False) else self.sign, 
+                            base_header, proxy
                         )
+                    
                     if d_success and d_data.get("success"):
                         return d_data["params"]
                     else:
@@ -441,12 +566,28 @@ class beian:
                     logger.error(f"详情获取异常 dataId={item.get('dataId')} err={e}")
                     return item
 
-            tasks = [fetch_detail(it) for it in items]
-            detailed_list = await asyncio.gather(*tasks)
+            # 分批处理，避免创建过多任务
+            batch_size = max_concurrency * 2
+            detailed_list = []
+            
+            for i in range(0, len(items), batch_size):
+                batch = items[i:i + batch_size]
+                tasks = [fetch_detail(item) for item in batch]
+                batch_results = await asyncio.gather(*tasks, return_exceptions=True)
+                
+                # 处理异常结果
+                for j, res in enumerate(batch_results):
+                    if isinstance(res, Exception):
+                        logger.error(f"批次任务异常: {res}")
+                        detailed_list.append(batch[j])  # 返回原始数据
+                    else:
+                        detailed_list.append(res)
+            
             result["params"]["list"] = detailed_list
             logger.info(f"并发详情完成，总计 {len(detailed_list)} 条")
+            
         return True, result
-    
+
     async def getblackbeian(self, name, sp, proxy=""):
         info = ujson.loads(self.btypj.get(sp))
         if sp == 0:
@@ -454,17 +595,54 @@ class beian:
         else:
             info["serviceName"] = name
 
-        success, p_uuid, token, sign, base_header = await self.check_img(proxy)
-        if not success:
-            return False, p_uuid
-        
-        length = str(len(str(ujson.dumps(info, ensure_ascii=False)).encode("utf-8")))
-        base_header.update(
-            {"Content-Length": length, "Uuid": p_uuid, "Token": token, "Sign": sign}
-        )
-        async with await self.get_session(proxy) as session:
-            async with session.post((self.blackqueryByCondition if sp == 0 else self.blackappAndMiniByCondition), data=ujson.dumps(info, ensure_ascii=False), headers=base_header, proxy=proxy if proxy else None) as req:
-                res = await req.text()
+
+        if getattr(getattr(config, 'captcha', object()), 'enable', False):
+            success, p_uuid, token, sign, base_header = await self.check_img(proxy)
+            if not success:
+                return False, p_uuid
+            
+            length = str(len(str(ujson.dumps(info, ensure_ascii=False)).encode("utf-8")))
+            base_header.update(
+                {"Content-Length": length, "Uuid": p_uuid, "Token": token, "Sign": sign}
+            )
+            async with self.get_session(proxy) as session:
+                current_ip = None
+                if hasattr(session, '_connector') and hasattr(session._connector, '_local_addr'):
+                    current_ip = session._connector._local_addr[0] if session._connector._local_addr else None
+                async with session.post((self.blackqueryByCondition if sp == 0 else self.blackappAndMiniByCondition),
+                                         data=ujson.dumps(info, ensure_ascii=False),
+                                         headers=base_header, proxy=proxy if proxy else None) as req:
+                    res = await req.text()
+            
+        else:
+            success, token, base_header = await self.get_token(proxy)
+            sign = ""
+            p_uuid = ""
+            if not success:
+                logger.info(f"获取token失败")
+                return False, None
+            base_header.update({"Token": token, "Sign": self.sign})
+
+            async with self.get_session(proxy) as session:
+                current_ip = None
+                if hasattr(session, '_connector') and hasattr(session._connector, '_local_addr'):
+                    current_ip = session._connector._local_addr[0] if session._connector._local_addr else None
+                async with session.post((f"{self.blackqueryByCondition}/" if sp == 0 else f"{self.blackappAndMiniByCondition}/"),
+                                            json=info, 
+                                            headers=base_header, proxy=proxy if proxy else None) as req:
+                    res = await req.text()
+
+        if "当前访问疑似黑客攻击" in res:
+            if current_ip:
+                self._add_blocked_ip(current_ip)
+            elif not proxy and self.local_ipv6_addresses:
+                # 如果无法直接获取IP，使用当前轮询的IPv6
+                with self._ipv6_lock:
+                    blocked_index = (self.ipv6_index - 1) % len(self.local_ipv6_addresses)
+                    blocked_ip = self.local_ipv6_addresses[blocked_index]
+                    self._add_blocked_ip(blocked_ip)
+            return False, "当前访问已被创宇盾拦截"
+
         return True,ujson.loads(res)
 
     async def autoget(self, name, sp, pageNum="", pageSize="", proxy="", b=1):
@@ -522,17 +700,29 @@ class beian:
     async def bymKuaiApp(self, name, proxy=""):
         return await self.autoget(name, 3, b=0, proxy=proxy)
 
+    async def cleanup(self):
+        """清理资源 - 移除连接器缓存相关代码"""
+        logger.info("beian资源清理完成")
+
+    def __del__(self):
+        """析构函数，确保资源清理"""
+        try:
+            pass
+        except:
+            pass
 
 if __name__ == "__main__":
-
     async def main():
         a = beian()
-        # 官方单页查询pageSize最大支持26
-        # 页面索引pageNum从1开始,第一页可以不写
-        data = await a.ymWeb("深圳市腾讯计算机系统有限公司")
-        print(f"查询结果：\n{data}")
-        data = await a.ymApp("深圳市腾讯计算机系统有限公司")
-        print(f"查询结果：\n{data}")
+        try:
+            # 官方单页查询pageSize最大支持26
+            # 页面索引pageNum从1开始,第一页可以不写
+            data = await a.ymWeb("深圳市腾讯计算机系统有限公司")
+            print(f"查询结果：\n{data}")
+            data = await a.ymApp("深圳市腾讯计算机系统有限公司")
+            print(f"查询结果：\n{data}")
+        finally:
+            await a.cleanup()  # 确保资源清理
 
     asyncio.run(main())
 
@@ -542,6 +732,9 @@ if __name__ == "__main__":
         from ymicp import beian
 
         icp = beian()
-        data = await icp.ymApp("微信")
+        try:
+            data = await icp.ymApp("微信")
+        finally:
+            await icp.cleanup()  # 重要：确保资源清理
     
     """

@@ -6,7 +6,7 @@ system:
   port: 16181
 
   # 请求超时时间，默认5秒
-  http_client_timeout: 2
+  http_client_timeout: 5
 
   # 启动web界面，可视化批量提交查询，导出为excel
   # 地址：http://{host}:{port}
@@ -30,7 +30,7 @@ captcha:
 
   # 查询失败时的重试次数，失败可能是由于目标网络、本地网络、代理、打码失败引起
   # 由于官方插入了大量干扰强的验证码，导致人工点选的准确率也大幅下降
-  retry_times: 50
+  retry_times: 2
 
   # 打码方式，默认自动打码，可选人工：labour，默认auto，人工打码需要桌面环境支持
   coding_code: auto
@@ -108,7 +108,7 @@ proxy:
 
 risk_avoidance:
   # 允许查询的类型
-  allow_type: ["web", "app", "mapp", "kapp", "bweb", "bapp", "bmapp", "mkapp"]
+  allow_type: ["web", "app", "mapp", "kapp", "bweb", "bapp", "bmapp", "bkapp"]
 
   # 不允许查询的域名后缀、主体、应用名称、备案号等
   prohibit_suffix:

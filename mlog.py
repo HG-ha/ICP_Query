@@ -29,7 +29,7 @@ def create_logger(log_dir, log_filename, backup_count, log_level=logging.INFO):
     logger.setLevel(log_level)
     # 创建日志格式
     formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        '%(asctime)s - %(name)s - %(levelname)s - %(funcName)s:%(lineno)d - %(message)s'
     )
 
     if config.log.save_log:
