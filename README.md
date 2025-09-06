@@ -3,15 +3,16 @@
 </p>
 
 <p align="center">
+  <img src="https://img.shields.io/badge/python-3.11-blue?style=flat-square" alt="Python Version"/>
   <a href="https://github.com/HG-ha/ICP_Query">
     <img src="https://img.shields.io/github/v/tag/HG-ha/ICP_Query?label=version&style=flat-square&sort=semver" alt="Latest Version"/>
   </a>
-  <img src="https://img.shields.io/badge/python-3.11-blue?style=flat-square" alt="Python Version"/>
   <a href="https://github.com/HG-ha/ICP_Query/releases">
     <img src="https://img.shields.io/github/downloads/HG-ha/ICP_Query/total?style=flat-square" alt="GitHub Downloads"/>
   </a>
-  <img src="https://img.shields.io/docker/pulls/yiminger/ymicp?logo=docker&style=flat-square" alt="Docker Pulls">
-  <img src="https://img.shields.io/github/release-date/HG-ha/ICP_Query?style=flat-square&logo=github" alt="Last commit">
+  <a href="https://hub.docker.com/repository/docker/yiminger/ymicp">
+    <img src="https://img.shields.io/docker/pulls/yiminger/ymicp?logo=docker&style=flat-square" alt="Docker Pulls">
+  </a>
 </p>
 
 > **注意：** 开源目的仅学习交流逆向与验证码识别技术使用
