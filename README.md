@@ -31,6 +31,7 @@
 ### 1. Docker部署
 
 ```shell
+# 自动打码，非绕过验证码
 docker run -d -p 16181 yiminger/ymicp
 ```
 
