@@ -27,7 +27,7 @@
 - ✅ 支持配置多种代理方式，内置webui便于直观查看效果
 - ✅ AMD 9600X 处理器平均识别仅需0.09s，支持模型加速
 
-## 🎯验证码识别效果
+## 🎯 验证码识别效果
 <div align="center">
   <img width="500" height="240" alt="image" src="https://github.com/user-attachments/assets/7acf9a45-c947-4dd0-9185-839e43b4483f" />
   <img width="500" height="240" alt="image" src="https://github.com/user-attachments/assets/e5fc2452-8d32-408d-adcd-f62f5c1bdc7f" />
