@@ -25,6 +25,17 @@
 - ✅ 提供简单易用的高性能接口以及发行版程序
 - ✅ 独立配置文件，支持绕过（随时可能和谐，但查询速度快，失败会提示“工信部服务器异常”）和自动识别验证码方式 `captcha.enable` 如果绕过失败请手动启用 `captcha`
 - ✅ 支持配置多种代理方式，内置webui便于直观查看效果
+- ✅ AMD 9600X 处理器平均识别仅需0.09s，支持模型加速
+
+## 🎯验证码识别效果
+<div align="center">
+  <img width="500" height="240" alt="image" src="https://github.com/user-attachments/assets/7acf9a45-c947-4dd0-9185-839e43b4483f" />
+  <img width="500" height="240" alt="image" src="https://github.com/user-attachments/assets/e5fc2452-8d32-408d-adcd-f62f5c1bdc7f" />
+  <img width="500" height="240" alt="image" src="https://github.com/user-attachments/assets/7cbfad57-186b-493c-8461-8475eca126ad" />
+  <img width="500" height="240" alt="image" src="https://github.com/user-attachments/assets/b83f3238-b2e3-4f19-894c-015fd694a09d" />
+</div>
+
+
 
 ## 🚀 部署方式
 
