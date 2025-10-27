@@ -84,6 +84,10 @@ def create_app():
     # 设置模板
     aiohttp_jinja2.setup(app, loader=jinja2.FileSystemLoader(get_resource_path("templates")))
     
+    # 配置静态文件服务
+    from aiohttp import web as aio_web
+    app.router.add_static('/static/', path=get_resource_path('static'), name='static')
+    
     # 配置代理池
     if config.proxy.local_ipv6_pool.enable:
         app.on_startup.append(init_ipv6_pool)
