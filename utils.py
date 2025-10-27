@@ -65,6 +65,47 @@ def _run_cmd_capture(cmd):
     return out.decode("utf-8", errors="ignore")
 
 
+def check_has_permanent_ipv6():
+    """
+    检查系统中是否存在永久有效的IPv6地址（valid_lft forever）
+    返回: (has_permanent, sample_address)
+    """
+    try:
+        if os.name == 'nt':
+            # Windows下检查 SkipAsSource=False 的地址（永久地址通常是这样配置的）
+            output = _run_cmd_capture(["netsh", "interface", "ipv6", "show", "addresses"])
+            if output:
+                for line in output.splitlines():
+                    line_strip = line.strip()
+                    # Windows下永久地址通常显示为 "手动" 或 "Manual"
+                    if any(k in line_strip for k in ("手动", "Manual")) and ":" in line_strip:
+                        parts = line_strip.split()
+                        candidate = parts[-1].split("/")[0]
+                        if ":" in candidate and is_public_ipv6(candidate):
+                            return (True, candidate)
+        else:
+            # Linux下检查 valid_lft forever 的地址
+            output = _run_cmd_capture(["ip", "-6", "addr", "show"])
+            if output:
+                lines = output.splitlines()
+                for i, line in enumerate(lines):
+                    line_strip = line.strip()
+                    if ("inet6" in line_strip) and ("scope global" in line_strip):
+                        try:
+                            candidate = line_strip.split()[1].split("/")[0]
+                            if is_public_ipv6(candidate):
+                                # 检查下一行是否包含 valid_lft forever
+                                if i + 1 < len(lines):
+                                    next_line = lines[i + 1].strip()
+                                    if "valid_lft forever" in next_line:
+                                        return (True, candidate)
+                        except:
+                            continue
+    except Exception as e:
+        logger.debug(f"检测永久IPv6地址时出错: {e}")
+    return (False, None)
+
+
 def get_local_ipv6_addresses():
     """获取本地IPv6地址"""
     addresses = []

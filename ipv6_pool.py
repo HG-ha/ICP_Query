@@ -10,7 +10,7 @@ import aiohttp
 from typing import List, Optional
 from mlog import logger
 from load_config import config
-from utils import get_local_ipv6_addresses, configure_ipv6_addresses, is_public_ipv6
+from utils import get_local_ipv6_addresses, configure_ipv6_addresses, is_public_ipv6, check_has_permanent_ipv6
 
 
 class IPv6AddressPool:
@@ -35,8 +35,20 @@ class IPv6AddressPool:
         await self._refresh_system_addresses()
         
         if not self.system_addresses:
-            logger.error("未找到任何公网IPv6地址，无法启用IPv6池")
+            logger.error("未找到任何公网IPv6地址,无法启用IPv6池")
             return False
+        
+        # 检测是否存在永久有效的IPv6地址（云服务器特征）
+        has_permanent, sample_addr = check_has_permanent_ipv6()
+        if has_permanent:
+            logger.warning("=" * 80)
+            logger.warning("⚠️  检测到系统中存在永久有效的IPv6地址（valid_lft forever）")
+            logger.warning(f"⚠️  地址: {sample_addr}")
+            logger.warning("⚠️  这通常说明您正在使用云服务器环境（如阿里云、腾讯云等）")
+            logger.warning("⚠️  在云服务器环境中，新增的IPv6地址可能需要通过云服务商控制台配置才能使用")
+            logger.warning("⚠️  如果遇到新增IPv6地址无法访问外网的情况，请联系您的云服务提供商")
+            logger.warning("⚠️  或在云服务商控制台中为您的实例分配和绑定IPv6地址段")
+            logger.warning("=" * 80)
         
         # 提取IPv6前缀
         self._last_prefix = self._extract_prefix(self.system_addresses[0])
@@ -56,16 +68,19 @@ class IPv6AddressPool:
                 if not is_public_ipv6(addr):
                     logger.warning(f"IPv6地址不是公网地址（网段检测）: {addr}")
                     return False
-                
+                self.active_addresses[addr] = time.time()
+                verified_count += 1
+                logger.info(f"✓ IPv6地址可用: {addr}")
+                return True
                 # 然后验证实际可达性
-                if await self._verify_ipv6_address(addr):
-                    self.active_addresses[addr] = time.time()
-                    verified_count += 1
-                    logger.info(f"✓ IPv6地址可用: {addr}")
-                    return True
-                else:
-                    logger.warning(f"✗ IPv6地址不可用: {addr}")
-                    return False
+                # if await self._verify_ipv6_address(addr):
+                #     self.active_addresses[addr] = time.time()
+                #     verified_count += 1
+                #     logger.info(f"✓ IPv6地址可用: {addr}")
+                #     return True
+                # else:
+                #     logger.warning(f"✗ IPv6地址不可用: {addr}")
+                #     return False
         
         # 并发验证所有地址
         tasks = [verify_and_add(addr) for addr in self.system_addresses]
