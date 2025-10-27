@@ -43,7 +43,7 @@
 
 ```shell
 # 自动打码，非绕过验证码
-docker run -d -p 16181 yiminger/ymicp
+docker run -d -p 16181:16181 yiminger/ymicp
 ```
 
 ### 2. 本地部署（可执行文件）
