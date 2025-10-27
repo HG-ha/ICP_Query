@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from siamese import Siamese
 import cv2
 from PIL import Image

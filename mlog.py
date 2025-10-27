@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from load_config import config
 import logging
 from logging.handlers import TimedRotatingFileHandler

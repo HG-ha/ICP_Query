@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import asyncio
 import aiohttp
 import cv2

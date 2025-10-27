@@ -1,11 +1,20 @@
+# -*- coding: utf-8 -*-
 """
 ICP备案查询系统 - 主入口文件
 重构版本：模块化架构
 """
+import sys
+import io
 import logging
 from aiohttp import web
 import aiohttp_jinja2
 import jinja2
+
+# 设置标准输出编码为UTF-8，避免在不同环境下出现编码错误
+if sys.stdout.encoding != 'utf-8':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+if sys.stderr.encoding != 'utf-8':
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
 # 导入自定义模块
 from mlog import logger

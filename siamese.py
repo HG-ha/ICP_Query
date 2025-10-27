@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import numbers
 import numpy as np
 import onnxruntime as ort
