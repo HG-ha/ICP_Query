@@ -15,7 +15,7 @@ captcha:
   coding_show: false
 proxy:
   local_ipv6_pool:
-    enable: false
+    enable: true
     pool_num: 88
     check_interval: 1
     ipv6_network_card: eth0

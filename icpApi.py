@@ -15,7 +15,8 @@ from ymicp import beian
 from utils import get_resource_path, is_valid_url
 from task_manager import TaskManager, setup_signal_handlers
 from log_collector import LogCollector, CollectorHandler, log_collector
-from proxy_pool import init_ipv6_pool, init_proxy_pool_task, cleanup_proxy_pool_task
+from proxy_pool import init_proxy_pool_task, cleanup_proxy_pool_task
+from ipv6_pool import init_ipv6_pool, cleanup_ipv6_pool
 from middlewares import options_middleware
 from routes import setup_routes
 
@@ -86,6 +87,7 @@ def create_app():
     # 配置代理池
     if config.proxy.local_ipv6_pool.enable:
         app.on_startup.append(init_ipv6_pool)
+        app.on_cleanup.append(cleanup_ipv6_pool)
     elif config.proxy.tunnel.url is None:
         if config.proxy.extra_api.url is not None:
             if is_valid_url(config.proxy.extra_api.url):

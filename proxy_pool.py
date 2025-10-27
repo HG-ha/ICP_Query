@@ -156,43 +156,7 @@ class ProxyPool:
         return random_key
 
 
-# IPv6地址池相关函数
-async def init_ipv6_pool(app):
-    """初始化IPv6地址池"""
-    from utils import get_local_ipv6_addresses, configure_ipv6_addresses, is_public_ipv6
-    
-    logger.info("启用本地IPv6轮询")
-    local_ipv6_addresses = get_local_ipv6_addresses()
-    public_ipv6_addresses = [addr for addr in local_ipv6_addresses if is_public_ipv6(addr)]
-    if len(public_ipv6_addresses) < config.proxy.local_ipv6_pool.pool_num:
-        prefix = ":".join(public_ipv6_addresses[0].split(":")[0:4])  # 获取前四位作为前缀
-        configure_ipv6_addresses(
-            prefix, 
-            config.proxy.local_ipv6_pool.pool_num - len(public_ipv6_addresses), 
-            config.proxy.local_ipv6_pool.ipv6_network_card
-        )
-        logger.info(f"已配置 {config.proxy.local_ipv6_pool.pool_num - len(public_ipv6_addresses)} 个新的IPv6地址")
-    else:
-        logger.info("已有足够的IPv6地址，无需配置")
-    asyncio.create_task(check_and_update_ipv6_pool())
-
-
-async def check_and_update_ipv6_pool():
-    """检查并更新IPv6地址池"""
-    from utils import get_local_ipv6_addresses, configure_ipv6_addresses, is_public_ipv6
-    
-    while True:
-        local_ipv6_addresses = get_local_ipv6_addresses()
-        public_ipv6_addresses = [addr for addr in local_ipv6_addresses if is_public_ipv6(addr)]
-        if len(public_ipv6_addresses) < config.proxy.local_ipv6_pool.pool_num:
-            prefix = ":".join(public_ipv6_addresses[0].split(":")[0:4])  # 获取前四位作为前缀
-            configure_ipv6_addresses(
-                prefix, 
-                config.proxy.local_ipv6_pool.pool_num - len(public_ipv6_addresses), 
-                config.proxy.local_ipv6_pool.ipv6_network_card
-            )
-            logger.info(f"已补充 {config.proxy.local_ipv6_pool.pool_num - len(public_ipv6_addresses)} 个新的IPv6地址")
-        await asyncio.sleep(config.proxy.local_ipv6_pool.check_interval)
+# IPv6地址池相关函数已迁移到 ipv6_pool.py
 
 
 async def init_proxy_pool_task(app):

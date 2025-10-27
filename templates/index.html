@@ -850,44 +850,110 @@
                     <i class="bi bi-globe"></i> 代理配置
                 </div>
                 <div class="card-body">
-                    <h6 class="mb-3">隧道代理</h6>
-                    <div class="mb-3">
-                        <label class="form-label">代理URL (格式: http://user:pass@host:port)</label>
-                        <input type="text" id="cfg-tunnel-url" class="form-control" placeholder="留空则不使用隧道代理">
+                    <!-- IPv6地址池配置 -->
+                    <div class="border rounded p-3 mb-3 bg-light">
+                        <h6 class="mb-3"><i class="bi bi-diagram-3"></i> 本地IPv6地址池</h6>
+                        <div class="row mb-3">
+                            <div class="col-md-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="cfg-ipv6-enable">
+                                    <label class="form-check-label" for="cfg-ipv6-enable">
+                                        <strong>启用IPv6池</strong>
+                                    </label>
+                                </div>
+                                <small class="text-muted">自动配置和维护IPv6地址</small>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">地址池大小</label>
+                                <input type="number" id="cfg-ipv6-pool-num" class="form-control" placeholder="88" min="1" max="200">
+                                <small class="text-muted">建议: 50-100</small>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">检查间隔(秒)</label>
+                                <input type="number" id="cfg-ipv6-check-interval" class="form-control" placeholder="1" min="1">
+                                <small class="text-muted">定时维护间隔</small>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">网卡名称</label>
+                                <input type="text" id="cfg-ipv6-network-card" class="form-control" placeholder="eth0">
+                                <small class="text-muted">Windows: 以太网, Linux: eth0</small>
+                            </div>
+                        </div>
+                        <div class="alert alert-warning mb-0">
+                            <i class="bi bi-exclamation-triangle-fill"></i>
+                            <strong>注意：</strong>
+                            <ul class="mb-0 mt-2">
+                                <li>启用前请确保系统已配置公网IPv6地址</li>
+                                <li>系统会自动验证地址的可用性（通过 ifconfig.me 检测）</li>
+                                <li>只有真正的公网可达IPv6地址才会被使用</li>
+                                <li>Windows系统需要管理员权限才能添加IPv6地址</li>
+                            </ul>
+                        </div>
                     </div>
 
                     <hr>
-                    <h6 class="mb-3">API提取代理</h6>
-                    <div class="row mb-3">
-                        <div class="col-md-6">
-                            <label class="form-label">提取API地址</label>
-                            <input type="text" id="cfg-extra-api-url" class="form-control" placeholder="留空则不使用API代理">
+                    
+                    <!-- 隧道代理配置 -->
+                    <div class="border rounded p-3 mb-3 bg-light">
+                        <h6 class="mb-3"><i class="bi bi-diagram-2"></i> 隧道代理</h6>
+                        <div class="mb-3">
+                            <label class="form-label">代理URL</label>
+                            <input type="text" id="cfg-tunnel-url" class="form-control" placeholder="http://user:pass@host:port (留空则不使用)">
+                            <small class="text-muted">格式: http://用户名:密码@主机:端口</small>
                         </div>
-                        <div class="col-md-3">
-                            <label class="form-label">提取间隔(秒)</label>
-                            <input type="number" id="cfg-extra-interval" class="form-control" placeholder="3">
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">代理池大小</label>
-                            <input type="number" id="cfg-pool-num" class="form-control" placeholder="100">
+                        <div class="alert alert-info mb-0">
+                            <i class="bi bi-info-circle"></i> 隧道代理优先级最高，启用后会优先使用隧道代理
                         </div>
                     </div>
-                    <div class="row mb-3">
-                        <div class="col-md-4">
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="cfg-auto-maintenace">
-                                <label class="form-check-label" for="cfg-auto-maintenace">
-                                    自动维护代理池
-                                </label>
+
+                    <hr>
+                    
+                    <!-- API提取代理配置 -->
+                    <div class="border rounded p-3 mb-0">
+                        <h6 class="mb-3"><i class="bi bi-cloud-download"></i> API提取代理</h6>
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">提取API地址</label>
+                                <input type="text" id="cfg-extra-api-url" class="form-control" placeholder="留空则不使用API代理">
+                                <small class="text-muted">返回格式: 每行一个IP:端口</small>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">提取间隔(秒)</label>
+                                <input type="number" id="cfg-extra-interval" class="form-control" placeholder="3" min="1">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">代理池大小</label>
+                                <input type="number" id="cfg-pool-num" class="form-control" placeholder="100" min="10" max="1000">
                             </div>
                         </div>
-                        <div class="col-md-4">
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="cfg-check-proxy">
-                                <label class="form-check-label" for="cfg-check-proxy">
-                                    入库前检测代理
-                                </label>
+                        <div class="row mb-3">
+                            <div class="col-md-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="cfg-auto-maintenace">
+                                    <label class="form-check-label" for="cfg-auto-maintenace">
+                                        自动维护代理池
+                                    </label>
+                                </div>
                             </div>
+                            <div class="col-md-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="cfg-check-proxy">
+                                    <label class="form-check-label" for="cfg-check-proxy">
+                                        入库前检测代理
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">代理超时(秒)</label>
+                                <input type="number" id="cfg-proxy-timeout" class="form-control" placeholder="0.5" step="0.1" min="0.1">
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">检测并发数</label>
+                                <input type="number" id="cfg-check-proxy-num" class="form-control" placeholder="20" min="1" max="100">
+                            </div>
+                        </div>
+                        <div class="alert alert-info mb-0">
+                            <i class="bi bi-info-circle"></i> API代理会在没有隧道代理和IPv6池时使用
                         </div>
                     </div>
                 </div>
@@ -924,13 +990,21 @@
                 </div>
             </div>
 
-            <div class="text-end">
-                <button type="button" class="btn btn-secondary btn-lg me-2" onclick="loadConfig()">
-                    <i class="bi bi-arrow-clockwise"></i> 重新加载
-                </button>
-                <button type="button" class="btn btn-primary btn-lg" onclick="saveConfig()">
-                    <i class="bi bi-save"></i> 保存配置
-                </button>
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <button type="button" class="btn btn-warning btn-lg" onclick="restartService()">
+                        <i class="bi bi-arrow-repeat"></i> 重启服务
+                    </button>
+                    <small class="text-muted ms-2">重启后新配置才会生效</small>
+                </div>
+                <div>
+                    <button type="button" class="btn btn-secondary btn-lg me-2" onclick="loadConfig()">
+                        <i class="bi bi-arrow-clockwise"></i> 重新加载
+                    </button>
+                    <button type="button" class="btn btn-primary btn-lg" onclick="saveConfig()">
+                        <i class="bi bi-save"></i> 保存配置
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -944,7 +1018,7 @@
                 </div>
                 <div class="card-body">
                     <h4>ICP备案批量查询系统</h4>
-                    <p class="text-muted">版本：2.0.0</p>
+                    <p class="text-muted">版本：0.6.3</p>
                     <hr>
                     <h5>功能特性</h5>
                     <ul>
@@ -960,6 +1034,8 @@
                     <p>1. <strong>单个查询</strong>：选择查询类型，输入查询内容，点击查询按钮即可。</p>
                     <p>2. <strong>批量查询</strong>：在文本框中输入多个查询内容（每行一个），设置并发数量后开始查询。</p>
                     <p>3. <strong>历史记录</strong>：查看所有查询历史，支持按类型筛选和导出。</p>
+                    <h5>项目地址</h5>
+                    <p><a href="https://github.com/HG-ha/ICP_Query" target="_blank">https://github.com/HG-ha/ICP_Query</a></p>
                 </div>
             </div>
         </div>
@@ -2522,13 +2598,23 @@
                     document.getElementById('cfg-retry-times').value = cfg.captcha.retry_times;
                     document.getElementById('cfg-coding-code').value = cfg.captcha.coding_code;
 
-                    // 代理配置
+                    // 代理配置 - IPv6地址池
+                    document.getElementById('cfg-ipv6-enable').checked = cfg.proxy.local_ipv6_pool?.enable || false;
+                    document.getElementById('cfg-ipv6-pool-num').value = cfg.proxy.local_ipv6_pool?.pool_num || 88;
+                    document.getElementById('cfg-ipv6-check-interval').value = cfg.proxy.local_ipv6_pool?.check_interval || 1;
+                    document.getElementById('cfg-ipv6-network-card').value = cfg.proxy.local_ipv6_pool?.ipv6_network_card || 'eth0';
+
+                    // 代理配置 - 隧道代理
                     document.getElementById('cfg-tunnel-url').value = cfg.proxy.tunnel.url || '';
+                    
+                    // 代理配置 - API提取代理
                     document.getElementById('cfg-extra-api-url').value = cfg.proxy.extra_api.url || '';
                     document.getElementById('cfg-extra-interval').value = cfg.proxy.extra_api.extra_interval;
                     document.getElementById('cfg-pool-num').value = cfg.proxy.extra_api.pool_num;
                     document.getElementById('cfg-auto-maintenace').checked = cfg.proxy.extra_api.auto_maintenace;
                     document.getElementById('cfg-check-proxy').checked = cfg.proxy.extra_api.check_proxy;
+                    document.getElementById('cfg-proxy-timeout').value = cfg.proxy.extra_api.proxy_timeout || 0.5;
+                    document.getElementById('cfg-check-proxy-num').value = cfg.proxy.extra_api.check_proxy_num || 20;
 
                     // 日志配置
                     document.getElementById('cfg-save-log').checked = cfg.log.save_log;
@@ -2541,6 +2627,52 @@
                 }
             } catch (error) {
                 showToast('加载配置出错：' + error.message, 'error');
+            }
+        }
+
+        // 重启服务
+        async function restartService() {
+            if (!confirm('确定要重启服务吗？\n\n重启过程约需要3-5秒，期间服务将暂时不可用。')) {
+                return;
+            }
+
+            try {
+                // 显示加载提示
+                showToast('正在请求重启服务...', 'info');
+                
+                const result = await httpRequest('POST', '/config/restart');
+
+                if (result.code === 200) {
+                    // 显示倒计时
+                    let countdown = 5;
+                    const countdownToast = showToast(`服务正在重启中，${countdown}秒后自动刷新页面...`, 'warning');
+                    
+                    const timer = setInterval(() => {
+                        countdown--;
+                        if (countdown > 0) {
+                            showToast(`服务正在重启中，${countdown}秒后自动刷新页面...`, 'warning');
+                        } else {
+                            clearInterval(timer);
+                            showToast('重启完成，正在刷新页面...', 'success');
+                            setTimeout(() => {
+                                window.location.reload();
+                            }, 1000);
+                        }
+                    }, 1000);
+                    
+                } else {
+                    showToast(result.message || '重启服务失败', 'error');
+                }
+            } catch (error) {
+                // 重启过程中连接断开是正常的
+                if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                    showToast('服务正在重启，5秒后自动刷新页面...', 'info');
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 5000);
+                } else {
+                    showToast('重启服务出错：' + error.message, 'error');
+                }
             }
         }
 
@@ -2570,10 +2702,10 @@
                     },
                     proxy: {
                         local_ipv6_pool: {
-                            enable: false,
-                            pool_num: 88,
-                            check_interval: 1,
-                            ipv6_network_card: "eth0"
+                            enable: document.getElementById('cfg-ipv6-enable').checked,
+                            pool_num: parseInt(document.getElementById('cfg-ipv6-pool-num').value) || 88,
+                            check_interval: parseInt(document.getElementById('cfg-ipv6-check-interval').value) || 1,
+                            ipv6_network_card: document.getElementById('cfg-ipv6-network-card').value || "eth0"
                         },
                         tunnel: {
                             url: document.getElementById('cfg-tunnel-url').value || null
@@ -2584,8 +2716,8 @@
                             timeout: 100,
                             timeout_drop: 8,
                             check_proxy: document.getElementById('cfg-check-proxy').checked,
-                            proxy_timeout: 0.5,
-                            check_proxy_num: 20,
+                            proxy_timeout: parseFloat(document.getElementById('cfg-proxy-timeout').value) || 0.5,
+                            check_proxy_num: parseInt(document.getElementById('cfg-check-proxy-num').value) || 20,
                             auto_maintenace: document.getElementById('cfg-auto-maintenace').checked,
                             pool_num: parseInt(document.getElementById('cfg-pool-num').value)
                         }
@@ -2602,7 +2734,14 @@
                 const result = await httpRequest('POST', '/config/save', configData);
 
                 if (result.code === 200) {
-                    showToast('配置保存成功！请重启服务使配置生效', 'success');
+                    showToast('配置保存成功！', 'success');
+                    
+                    // 询问是否立即重启
+                    setTimeout(() => {
+                        if (confirm('配置已保存成功！\n\n是否立即重启服务使配置生效？')) {
+                            restartService();
+                        }
+                    }, 1000);
                 } else {
                     showToast(result.message || '保存配置失败', 'error');
                 }

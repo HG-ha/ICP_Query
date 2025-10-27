@@ -3,7 +3,9 @@
 处理系统配置相关的API
 """
 import os
+import sys
 import shutil
+import asyncio
 from aiohttp import web
 from middlewares import jsondump, wj
 from load_config import config
@@ -152,6 +154,76 @@ async def save_config(request):
         except Exception as e:
             logger.error(f"保存配置文件失败: {e}")
             return wj({"code": 500, "message": f"保存配置失败: {str(e)}"})
+
+
+@jsondump
+@routes.view(r"/config/restart")
+async def restart_service(request):
+    """重启服务"""
+    if request.method == "POST":
+        try:
+            logger.warning("收到重启服务请求，将在3秒后重启...")
+            log_collector.add_log("收到重启服务请求，将在3秒后重启...")
+            
+            # 异步延迟重启，先返回响应
+            async def delayed_restart():
+                try:
+                    await asyncio.sleep(3)
+                    logger.warning("正在重启服务...")
+                    
+                    # 获取当前Python解释器和脚本路径
+                    python = sys.executable
+                    main_script = sys.argv[0]
+                    restart_helper = get_resource_path('restart_helper.py')
+                    
+                    # 重启进程
+                    if os.name == 'nt':  # Windows
+                        import subprocess
+                        
+                        # 优先使用重启助手脚本
+                        if os.path.exists(restart_helper):
+                            # 使用重启助手脚本
+                            subprocess.Popen(
+                                [python, restart_helper],
+                                creationflags=subprocess.CREATE_NEW_CONSOLE,
+                                cwd=os.path.dirname(get_resource_path('.'))
+                            )
+                        else:
+                            # 直接重启
+                            subprocess.Popen(
+                                [python, main_script],
+                                cwd=os.path.dirname(os.path.abspath(main_script))
+                            )
+                        
+                        # 等待新进程启动
+                        await asyncio.sleep(1)
+                        
+                    else:  # Linux/Unix
+                        # Linux使用execv直接替换进程
+                        os.execv(python, [python] + sys.argv)
+                    
+                    # Windows: 优雅停止事件循环
+                    logger.info("停止当前服务进程...")
+                    loop = asyncio.get_event_loop()
+                    
+                    # 停止所有任务
+                    for task in asyncio.all_tasks(loop):
+                        task.cancel()
+                    
+                    # 停止事件循环
+                    loop.stop()
+                    
+                except Exception as e:
+                    logger.error(f"重启服务时出错: {e}")
+            
+            # 创建异步任务
+            asyncio.create_task(delayed_restart())
+            
+            return wj({"code": 200, "message": "服务将在3秒后重启"})
+            
+        except Exception as e:
+            logger.error(f"重启服务失败: {e}")
+            return wj({"code": 500, "message": f"重启服务失败: {str(e)}"})
 
 
 def setup_config_routes(app):
