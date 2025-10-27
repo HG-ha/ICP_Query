@@ -1073,12 +1073,35 @@
                 </div>
             </div>
 
+            <!-- 查询历史配置 -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <i class="bi bi-clock-history"></i> 查询历史配置
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="cfg-save-query-history">
+                                <label class="form-check-label" for="cfg-save-query-history">
+                                    <strong>保存查询历史记录</strong>
+                                </label>
+                            </div>
+                            <small class="text-muted">开启后，所有查询记录将保存到数据库，可在"查询历史"页面查看</small>
+                        </div>
+                    </div>
+                    <div class="alert alert-info mb-0">
+                        <i class="bi bi-info-circle"></i> 关闭此选项后，新的查询记录将不会被保存，但已有的历史记录不会被删除
+                    </div>
+                </div>
+            </div>
+
             <div class="d-flex justify-content-between align-items-center">
                 <div>
                     <button type="button" class="btn btn-warning btn-lg" onclick="restartService()">
                         <i class="bi bi-arrow-repeat"></i> 重启服务
                     </button>
-                    <small class="text-muted ms-2">重启后新配置才会生效</small>
+                    <small class="text-muted ms-2">重启后新配置才会生效，仅支持源代码运行时。docker和release版本不支持。</small>
                 </div>
                 <div>
                     <button type="button" class="btn btn-secondary btn-lg me-2" onclick="loadConfig()">
@@ -2736,6 +2759,9 @@
                     document.getElementById('cfg-output-console').checked = cfg.log.output_console;
                     document.getElementById('cfg-backup-count').value = cfg.log.backup_count;
 
+                    // 查询历史配置
+                    document.getElementById('cfg-save-query-history').checked = cfg.history?.save_query_history !== false;
+
                     showToast('配置加载成功', 'success');
                 } else {
                     showToast('加载配置失败', 'error');
@@ -2862,6 +2888,9 @@
                         backup_count: parseInt(document.getElementById('cfg-backup-count').value),
                         save_log: document.getElementById('cfg-save-log').checked,
                         output_console: document.getElementById('cfg-output-console').checked
+                    },
+                    history: {
+                        save_query_history: document.getElementById('cfg-save-query-history').checked
                     }
                 };
 

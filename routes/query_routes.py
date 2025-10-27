@@ -96,11 +96,13 @@ async def geturl(request):
             data = await bappth.get(path)(appname, proxy=proxy)
 
         if data.get("code", 500) == 200:
-            # 保存历史记录
-            db = request.app.get("db")
-            if db:
-                result_count = len(data.get("params", {}).get("list", [])) if path in appth else len(data.get("params", []))
-                db.add_history(path, appname, result_count, data.get("params"))
+            # 保存历史记录（根据配置决定是否保存）
+            save_history = getattr(config, 'history', None) and getattr(config.history, 'save_query_history', True)
+            if save_history:
+                db = request.app.get("db")
+                if db:
+                    result_count = len(data.get("params", {}).get("list", [])) if path in appth else len(data.get("params", []))
+                    db.add_history(path, appname, result_count, data.get("params"))
             return wj(data)
         if data.get("message", "") == "当前访问已被创宇盾拦截":
             logger.warning("当前访问已被创宇盾拦截")

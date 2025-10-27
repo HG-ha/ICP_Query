@@ -71,6 +71,9 @@ async def get_config(request):
                 "backup_count": config.log.backup_count,
                 "save_log": config.log.save_log,
                 "output_console": config.log.output_console
+            },
+            "history": {
+                "save_query_history": getattr(config, 'history', None) and getattr(config.history, 'save_query_history', True)
             }
         }
         return wj({"code": 200, "data": config_data})
@@ -138,6 +141,9 @@ async def save_config(request):
                     "backup_count": int(data.get("log", {}).get("backup_count", 7)),
                     "save_log": bool(data.get("log", {}).get("save_log", False)),
                     "output_console": bool(data.get("log", {}).get("output_console", True))
+                },
+                "history": {
+                    "save_query_history": bool(data.get("history", {}).get("save_query_history", True))
                 }
             }
             

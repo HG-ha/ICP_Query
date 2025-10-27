@@ -48,3 +48,5 @@ log:
   backup_count: 7
   save_log: false
   output_console: true
+history:
+  save_query_history: false
