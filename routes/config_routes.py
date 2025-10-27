@@ -11,7 +11,7 @@ from middlewares import jsondump, wj
 from load_config import config
 from mlog import logger
 from log_collector import log_collector
-from utils import get_resource_path
+from utils import get_resource_path, get_network_interfaces
 
 
 routes = web.RouteTableDef()
@@ -60,6 +60,10 @@ async def get_config(request):
                     "auto_maintenace": config.proxy.extra_api.auto_maintenace,
                     "pool_num": config.proxy.extra_api.pool_num
                 }
+            },
+            "risk_avoidance": {
+                "allow_type": getattr(config.risk_avoidance, 'allow_type', ["web", "app", "mapp", "kapp", "bweb", "bapp", "bmapp", "bkapp"]),
+                "prohibit_suffix": getattr(config.risk_avoidance, 'prohibit_suffix', [])
             },
             "log": {
                 "dir": config.log.dir,
@@ -125,8 +129,8 @@ async def save_config(request):
                     }
                 },
                 "risk_avoidance": {
-                    "allow_type": ["web", "app", "mapp", "kapp", "bweb", "bapp", "bmapp", "bkapp"],
-                    "prohibit_suffix": []
+                    "allow_type": data.get("risk_avoidance", {}).get("allow_type", ["web", "app", "mapp", "kapp", "bweb", "bapp", "bmapp", "bkapp"]),
+                    "prohibit_suffix": data.get("risk_avoidance", {}).get("prohibit_suffix", [])
                 },
                 "log": {
                     "dir": data.get("log", {}).get("dir", "logs"),
@@ -154,6 +158,18 @@ async def save_config(request):
         except Exception as e:
             logger.error(f"保存配置文件失败: {e}")
             return wj({"code": 500, "message": f"保存配置失败: {str(e)}"})
+
+
+@jsondump
+@routes.view(r"/config/network-interfaces")
+async def get_network_interfaces_api(request):
+    """获取系统网卡列表"""
+    try:
+        interfaces = get_network_interfaces()
+        return wj({"code": 200, "data": interfaces})
+    except Exception as e:
+        logger.error(f"获取网卡列表失败: {e}")
+        return wj({"code": 500, "message": f"获取网卡列表失败: {str(e)}"})
 
 
 @jsondump

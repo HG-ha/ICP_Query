@@ -106,6 +106,50 @@ def check_has_permanent_ipv6():
     return (False, None)
 
 
+def get_network_interfaces():
+    """
+    获取系统网卡列表
+    返回: [{"name": "网卡名称", "display": "显示名称"}]
+    """
+    interfaces = []
+    try:
+        if os.name == 'nt':  # Windows
+            # 使用 netsh 获取网卡列表
+            output = _run_cmd_capture(["netsh", "interface", "show", "interface"])
+            if output:
+                lines = output.splitlines()
+                for line in lines[3:]:  # 跳过前3行标题
+                    parts = line.split()
+                    if len(parts) >= 4:
+                        # 格式: 状态 类型 接口名称
+                        # 获取接口名称（最后一个字段可能包含空格）
+                        interface_name = ' '.join(parts[3:])
+                        if interface_name and interface_name not in ['Loopback', '环回']:
+                            interfaces.append({
+                                "name": interface_name,
+                                "display": f"{interface_name}"
+                            })
+        else:  # Linux/Unix
+            # 使用 ip link 获取网卡列表
+            output = _run_cmd_capture(["ip", "link", "show"])
+            if output:
+                for line in output.splitlines():
+                    if ':' in line and not line.startswith(' '):
+                        # 格式: 2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP>
+                        parts = line.split(':')
+                        if len(parts) >= 2:
+                            interface_name = parts[1].strip()
+                            if interface_name and interface_name != 'lo':
+                                interfaces.append({
+                                    "name": interface_name,
+                                    "display": interface_name
+                                })
+    except Exception as e:
+        logger.debug(f"获取网卡列表时出错: {e}")
+    
+    return interfaces
+
+
 def get_local_ipv6_addresses():
     """获取本地IPv6地址"""
     addresses = []

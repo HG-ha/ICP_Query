@@ -877,15 +877,19 @@
                             </div>
                             <div class="col-md-3">
                                 <label class="form-label">网卡名称</label>
-                                <input type="text" id="cfg-ipv6-network-card" class="form-control" placeholder="eth0">
-                                <small class="text-muted">Windows: 以太网, Linux: eth0</small>
+                                <input type="text" id="cfg-ipv6-network-card" class="form-control" placeholder="eth0" list="network-interfaces-list">
+                                <datalist id="network-interfaces-list">
+                                    <!-- 动态加载网卡列表 -->
+                                </datalist>
+                                <small class="text-muted">可输入或选择网卡</small>
                             </div>
                         </div>
                         <div class="alert alert-warning mb-0">
                             <i class="bi bi-exclamation-triangle-fill"></i>
                             <strong>注意：</strong>
                             <ul class="mb-0 mt-2">
-                                <li>启用前请确保系统已配置公网IPv6地址</li>
+                                <li>启用前请确保系统已配置公网IPv6地址（家庭网络在支持ipv6的情况下通常无需额外配置）</li>
+                                <li>如果使用云服务器，请确保已在控制台中为实例分配IPv6地址，或联系云服务提供商下发ipv6地址，确保运营商下发了大于或等于地址池的IPv6地址</li>
                                 <li>系统会自动验证地址的可用性（通过 ifconfig.me 检测）</li>
                                 <li>只有真正的公网可达IPv6地址才会被使用</li>
                                 <li>Windows系统需要管理员权限才能添加IPv6地址</li>
@@ -957,6 +961,83 @@
                         <div class="alert alert-info mb-0">
                             <i class="bi bi-info-circle"></i> API代理会在没有隧道代理和IPv6池时使用
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 风险规避配置 -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <i class="bi bi-shield-check"></i> 风险规避配置
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-12">
+                            <label class="form-label">允许查询类型</label>
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input allow-type-checkbox" type="checkbox" id="allow-type-web" value="web">
+                                        <label class="form-check-label" for="allow-type-web">域名 (web)</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input allow-type-checkbox" type="checkbox" id="allow-type-app" value="app">
+                                        <label class="form-check-label" for="allow-type-app">App (app)</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input allow-type-checkbox" type="checkbox" id="allow-type-mapp" value="mapp">
+                                        <label class="form-check-label" for="allow-type-mapp">小程序 (mapp)</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input allow-type-checkbox" type="checkbox" id="allow-type-kapp" value="kapp">
+                                        <label class="form-check-label" for="allow-type-kapp">快应用 (kapp)</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row mt-2">
+                                <div class="col-md-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input allow-type-checkbox" type="checkbox" id="allow-type-bweb" value="bweb">
+                                        <label class="form-check-label" for="allow-type-bweb">违规域名 (bweb)</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input allow-type-checkbox" type="checkbox" id="allow-type-bapp" value="bapp">
+                                        <label class="form-check-label" for="allow-type-bapp">违规App (bapp)</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input allow-type-checkbox" type="checkbox" id="allow-type-bmapp" value="bmapp">
+                                        <label class="form-check-label" for="allow-type-bmapp">违规小程序 (bmapp)</label>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input allow-type-checkbox" type="checkbox" id="allow-type-bkapp" value="bkapp">
+                                        <label class="form-check-label" for="allow-type-bkapp">违规快应用 (bkapp)</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <small class="text-muted">至少选择一种查询类型</small>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-12">
+                            <label class="form-label">禁止的网址后缀</label>
+                            <textarea id="cfg-prohibit-suffix" class="form-control" rows="3" placeholder="每行一个后缀，例如：&#10;.gov.cn&#10;.edu.cn"></textarea>
+                            <small class="text-muted">包含这些后缀的网址将不允许查询，每行一个后缀</small>
+                        </div>
+                    </div>
+                    <div class="alert alert-info mb-0">
+                        <i class="bi bi-info-circle"></i> 风险规避配置用于限制可查询的类型和禁止特定后缀的网址查询
                     </div>
                 </div>
             </div>
@@ -2581,13 +2662,35 @@
 
         // ========== 配置管理相关函数 ==========
 
+        // 加载网卡列表
+        async function loadNetworkInterfaces() {
+            try {
+                const result = await httpRequest('GET', '/config/network-interfaces');
+                if (result.code === 200 && result.data) {
+                    const datalist = document.getElementById('network-interfaces-list');
+                    datalist.innerHTML = '';
+                    result.data.forEach(iface => {
+                        const option = document.createElement('option');
+                        option.value = iface.name;
+                        datalist.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.warn('加载网卡列表失败:', error);
+            }
+        }
+
         // 加载配置
         async function loadConfig() {
             try {
-                const result = await httpRequest('GET', '/config');
+                // 并行加载配置和网卡列表
+                const [configResult] = await Promise.all([
+                    httpRequest('GET', '/config'),
+                    loadNetworkInterfaces()
+                ]);
 
-                if (result.code === 200) {
-                    const cfg = result.data;
+                if (configResult.code === 200) {
+                    const cfg = configResult.data;
 
                     // 系统配置
                     document.getElementById('cfg-host').value = cfg.system.host;
@@ -2618,6 +2721,15 @@
                     document.getElementById('cfg-check-proxy').checked = cfg.proxy.extra_api.check_proxy;
                     document.getElementById('cfg-proxy-timeout').value = cfg.proxy.extra_api.proxy_timeout || 0.5;
                     document.getElementById('cfg-check-proxy-num').value = cfg.proxy.extra_api.check_proxy_num || 20;
+
+                    // 风险规避配置
+                    const allowTypes = cfg.risk_avoidance?.allow_type || ["web", "app", "mapp", "kapp", "bweb", "bapp", "bmapp", "bkapp"];
+                    document.querySelectorAll('.allow-type-checkbox').forEach(checkbox => {
+                        checkbox.checked = allowTypes.includes(checkbox.value);
+                    });
+                    
+                    const prohibitSuffix = cfg.risk_avoidance?.prohibit_suffix || [];
+                    document.getElementById('cfg-prohibit-suffix').value = prohibitSuffix.join('\n');
 
                     // 日志配置
                     document.getElementById('cfg-save-log').checked = cfg.log.save_log;
@@ -2686,6 +2798,21 @@
             }
 
             try {
+                // 收集允许的查询类型
+                const allowTypes = [];
+                document.querySelectorAll('.allow-type-checkbox:checked').forEach(checkbox => {
+                    allowTypes.push(checkbox.value);
+                });
+
+                if (allowTypes.length === 0) {
+                    showToast('请至少选择一种允许的查询类型', 'warning');
+                    return;
+                }
+
+                // 收集禁止的后缀
+                const prohibitSuffixText = document.getElementById('cfg-prohibit-suffix').value.trim();
+                const prohibitSuffix = prohibitSuffixText ? prohibitSuffixText.split('\n').map(s => s.trim()).filter(s => s) : [];
+
                 const configData = {
                     system: {
                         host: document.getElementById('cfg-host').value,
@@ -2724,6 +2851,10 @@
                             auto_maintenace: document.getElementById('cfg-auto-maintenace').checked,
                             pool_num: parseInt(document.getElementById('cfg-pool-num').value)
                         }
+                    },
+                    risk_avoidance: {
+                        allow_type: allowTypes,
+                        prohibit_suffix: prohibitSuffix
                     },
                     log: {
                         dir: "logs",

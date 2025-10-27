@@ -15,7 +15,7 @@ captcha:
   coding_show: false
 proxy:
   local_ipv6_pool:
-    enable: true
+    enable: false
     pool_num: 88
     check_interval: 1
     ipv6_network_card: eth0
@@ -41,7 +41,8 @@ risk_avoidance:
   - bapp
   - bmapp
   - bkapp
-  prohibit_suffix: []
+  prohibit_suffix:
+  - .gov.cn
 log:
   dir: logs
   file_head: ymicp
