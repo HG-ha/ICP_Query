@@ -4,322 +4,2634 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>ICP备案批量查询</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet"
-        integrity="sha384-GLhlTQ8iRABdZLl6O3oVMWSktQOp6b7In1Zl3/Jr59b6EGGoI1aFkw7cmDA6j6gD" crossorigin="anonymous">
+    <title>ICP备案批量查询系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
-            min-height: 100vh;
-            /* 使内容区域至少占满整个视口高度 */
+            font-family: 'Microsoft YaHei', 'Segoe UI', sans-serif;
+            overflow-x: hidden;
+        }
+
+        /* 侧边栏样式 */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            width: 250px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px 0;
+            z-index: 1000;
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        .sidebar-header {
+            padding: 0 20px 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            margin-bottom: 20px;
+        }
+
+        .sidebar-header h3 {
+            color: white;
+            font-weight: 600;
+            font-size: 20px;
+            margin: 0;
+        }
+
+        .sidebar-header p {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 12px;
+            margin: 5px 0 0 0;
+        }
+
+        .nav-item {
+            margin: 5px 15px;
+        }
+
+        .nav-link {
+            color: rgba(255, 255, 255, 0.8);
+            padding: 12px 20px;
+            border-radius: 8px;
+            transition: all 0.3s ease;
             display: flex;
-            flex-direction: column;
+            align-items: center;
+            text-decoration: none;
         }
 
-        .content {
-            flex: 1;
-            /* 占据剩余的空间 */
+        .nav-link:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            transform: translateX(5px);
         }
 
-        .no-wrap {
-            white-space: nowrap;
+        .nav-link.active {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            font-weight: 600;
+        }
+
+        .nav-link i {
+            margin-right: 10px;
+            font-size: 18px;
+        }
+
+        /* 主内容区域 */
+        .main-content {
+            margin-left: 250px;
+            padding: 30px;
+            min-height: 100vh;
+            background: #f5f7fa;
+        }
+
+        /* 页面容器 */
+        .page {
+            display: none;
+        }
+
+        .page.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* 卡片样式 */
+        .card {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+        }
+
+        .card-header {
+            background: white;
+            border-bottom: 2px solid #f0f0f0;
+            padding: 20px;
+            font-weight: 600;
+            color: #333;
+            border-radius: 12px 12px 0 0 !important;
+        }
+
+        .card-body {
+            padding: 25px;
+        }
+
+        /* 按钮样式 */
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 8px;
+            padding: 10px 25px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-outline-secondary {
+            border-radius: 8px;
+            padding: 10px 25px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+        }
+
+        .btn-outline-secondary:hover {
+            transform: translateY(-2px);
+        }
+
+        /* 表单控件样式 */
+        .form-control,
+        .form-select {
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+            padding: 10px 15px;
+            transition: all 0.3s ease;
+        }
+
+        .form-control:focus,
+        .form-select:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.15);
+        }
+
+        /* 表格样式 */
+        .table {
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .table thead th {
+            background: #f8f9fa;
+            border-bottom: 2px solid #e0e0e0;
+            font-weight: 600;
+            color: #555;
+            padding: 15px;
+        }
+
+        .table tbody td {
+            padding: 12px 15px;
+            vertical-align: middle;
+        }
+
+        .table tbody tr:hover {
+            background: #f8f9fa;
+        }
+
+        /* 进度条样式 */
+        .progress {
+            height: 30px;
+            border-radius: 15px;
+            background: #e9ecef;
+        }
+
+        .progress-bar {
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            border-radius: 15px;
+            font-weight: 600;
+        }
+
+        /* 警告框样式 */
+        .alert {
+            border: none;
+            border-radius: 10px;
+            padding: 15px 20px;
+        }
+
+        /* 徽章样式 */
+        .badge {
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-weight: 500;
+        }
+
+        /* 分页样式 */
+        .pagination {
+            margin-top: 20px;
+        }
+
+        .page-link {
+            border-radius: 8px;
+            margin: 0 3px;
+            border: 1px solid #e0e0e0;
+            color: #667eea;
+        }
+
+        .page-link:hover {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .page-item.active .page-link {
+            background: #667eea;
+            border-color: #667eea;
+        }
+
+        /* 加载动画 */
+        .spinner-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.3);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+
+        .spinner-overlay.show {
+            display: flex;
+        }
+
+        .spinner-content {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        /* 汉堡菜单按钮 */
+        .menu-toggle {
+            display: none;
+            position: fixed;
+            top: 15px;
+            left: 15px;
+            z-index: 1001;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 8px;
+            width: 45px;
+            height: 45px;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .menu-toggle:hover {
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        /* 移动端遮罩层 */
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
+
+        .sidebar-overlay.show {
+            display: block;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .menu-toggle {
+                display: block;
+            }
+
+            .sidebar {
+                width: 250px;
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+            }
+
+            .sidebar.show {
+                transform: translateX(0);
+            }
+
+            .main-content {
+                margin-left: 0;
+                padding: 70px 15px 15px 15px;
+            }
+
+            /* 移动端表格横向滚动 */
+            .table-responsive {
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            /* 移动端卡片最大宽度调整 */
+            .card {
+                max-width: 100% !important;
+                margin-left: 0 !important;
+                margin-right: 0 !important;
+            }
+
+            /* 移动端分页布局调整 */
+            .card-footer .d-flex {
+                flex-direction: column !important;
+                gap: 10px !important;
+            }
+
+            .card-footer .d-flex>div {
+                width: 100% !important;
+                justify-content: center !important;
+            }
+
+            /* 移动端表单优化 */
+            .row.align-items-end>div:not(:last-child) {
+                margin-bottom: 10px;
+            }
+
+            /* 移动端按钮组 */
+            .d-flex.gap-2 {
+                flex-direction: column !important;
+            }
+
+            .d-flex.gap-2 .btn {
+                width: 100% !important;
+            }
+
+            /* 移动端输入框 */
+            .form-control,
+            .form-select {
+                font-size: 16px;
+                /* 防止iOS自动缩放 */
+            }
+
+            /* 移动端进度条 */
+            .progress {
+                height: 30px !important;
+            }
+
+            /* 移动端标题 */
+            h2 {
+                font-size: 1.5rem !important;
+            }
+        }
+
+        /* 统计卡片 */
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card h3 {
+            font-size: 36px;
+            font-weight: 700;
+            margin: 10px 0;
+        }
+
+        .stat-card p {
+            opacity: 0.9;
+            margin: 0;
+        }
+
+        /* 空状态 */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+
+        .empty-state i {
+            font-size: 64px;
+            margin-bottom: 20px;
         }
     </style>
 </head>
 
 <body>
-    <div class="container">
-        <h1 class="text-center mt-5">ICP备案批量查询</h1>
-        <div class="mb-3 row mt-3">
-            <!-- 同时查询量 -->
-            <label class="col-sm-2 col-form-label" for="querynum">同时查询量</label>
-            <div class="col-sm-3">
-                <input type="text" class="form-control" id="querynum" value="20">
-            </div>
+    <!-- 汉堡菜单按钮 -->
+    <button class="menu-toggle" onclick="toggleSidebar()">
+        <i class="bi bi-list"></i>
+    </button>
 
-            <!-- 查询类型 -->
-            <label class="col-sm-2 col-form-label" for="dropdown">查询类型</label>
-            <div class="col-sm-3">
-                <select id="dropdown" class="form-select">
-                    <option value="web" selected>域名</option>
-                    <option value="app">App</option>
-                    <option value="mapp">小程序</option>
-                    <option value="kapp">快应用</option>
-                    <option value="bweb">违规域名</option>
-                    <option value="bweb">违规App</option>
-                    <option value="bweb">违规小程序</option>
-                    <option value="bweb">违规快应用</option>
-                </select>
-            </div>
+    <!-- 移动端遮罩层 -->
+    <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
+
+    <!-- 侧边栏 -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h3><i class="bi bi-shield-check"></i> ICP查询</h3>
+            <p>备案批量查询系统</p>
         </div>
-
-        <div class="mb-3 row">
-            <label class="col-sm-2 col-form-label">查询内容</label>
-            <div class="input-group mb-3 mt-1">
-                <textarea class="form-control" id="query_value" rows="3"
-                    placeholder="域名、程序名称、备案主体、备案号等，一行一个"></textarea>
-                <button class="btn btn-outline-secondary" type="button" id="button-addon2"
-                    onclick="getIcpInfo()">查询</button>
-                <button class="btn btn-outline-secondary" type="button" id="button-addon2"
-                    onclick="exportData()">导出</button>
-                <button class="btn btn-outline-secondary" type="button" id="button-addon2"
-                    onclick="deletetask()">终止任务</button>
+        <nav class="nav flex-column">
+            <div class="nav-item">
+                <a class="nav-link active" href="#" onclick="showPage('query', event)">
+                    <i class="bi bi-search"></i>
+                    <span>查询</span>
+                </a>
             </div>
-        </div>
-        <!-- 消息框 -->
-        <div id="liveAlertPlaceholder" class="mt-2 mt-3"></div>
-
+            <div class="nav-item">
+                <a class="nav-link" href="#" onclick="showPage('batch', event)">
+                    <i class="bi bi-list-check"></i>
+                    <span>批量查询</span>
+                </a>
+            </div>
+            <div class="nav-item">
+                <a class="nav-link" href="#" onclick="showPage('history', event)">
+                    <i class="bi bi-clock-history"></i>
+                    <span>查询历史</span>
+                </a>
+            </div>
+            <div class="nav-item">
+                <a class="nav-link" href="#" onclick="showPage('batch-history', event)">
+                    <i class="bi bi-archive"></i>
+                    <span>批量任务</span>
+                </a>
+            </div>
+            <div class="nav-item">
+                <a class="nav-link" href="#" onclick="showPage('logs', event)">
+                    <i class="bi bi-file-text"></i>
+                    <span>系统日志</span>
+                </a>
+            </div>
+            <div class="nav-item">
+                <a class="nav-link" href="#" onclick="showPage('config', event)">
+                    <i class="bi bi-gear-fill"></i>
+                    <span>配置管理</span>
+                </a>
+            </div>
+            <div class="nav-item">
+                <a class="nav-link" href="#" onclick="showPage('about', event)">
+                    <i class="bi bi-info-circle"></i>
+                    <span>关于</span>
+                </a>
+            </div>
+        </nav>
     </div>
 
-    <div class="container text-center">
-        <span id="provalue" style="display: none;">当前进度：0/0</span>
-        <div id="prohome" class="progress" role="progressbar" aria-label="Animated striped example" aria-valuenow="25"
-            aria-valuemin="0" aria-valuemax="100" style="display: none;">
-            <div id="pro" class="progress-bar progress-bar-striped progress-bar-animated" style="width: 0%"></div>
+    <!-- 主内容区域 -->
+    <div class="main-content">
+        <!-- 单个查询页面 -->
+        <div id="query-page" class="page active">
+            <h2 class="mb-4"><i class="bi bi-search"></i> 单个查询</h2>
+
+            <div class="card" style="max-width: 1200px; margin: 0 auto;">
+                <div class="card-header">
+                    <i class="bi bi-pencil-square"></i> 查询设置
+                </div>
+                <div class="card-body">
+                    <div class="row align-items-end g-2">
+                        <div class="col-12 col-sm-6 col-md-3 col-lg-2">
+                            <label class="form-label">查询类型</label>
+                            <select id="query-type" class="form-select">
+                                <option value="web">域名</option>
+                                <option value="app">App</option>
+                                <option value="mapp">小程序</option>
+                                <option value="kapp">快应用</option>
+                                <option value="bweb">违规域名</option>
+                                <option value="bapp">违规App</option>
+                                <option value="bmapp">违规小程序</option>
+                                <option value="bkapp">违规快应用</option>
+                            </select>
+                        </div>
+                        <div class="col-12 col-sm-12 col-md-6 col-lg-7">
+                            <label class="form-label">查询内容</label>
+                            <input type="text" id="query-keyword" class="form-control"
+                                placeholder="请输入域名、程序名称、备案主体或备案号">
+                        </div>
+                        <div class="col-12 col-sm-6 col-md-3 col-lg-3">
+                            <button type="button" class="btn btn-primary w-100" onclick="performQuery()">
+                                <i class="bi bi-search"></i> 开始查询
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 查询结果 -->
+            <div id="query-result-container" style="display: none;">
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <i class="bi bi-table"></i> 查询结果
+                    </div>
+                    <div class="card-body">
+                        <div id="query-result-table"></div>
+                    </div>
+                    <div class="card-footer bg-white">
+                        <div class="d-flex justify-content-between align-items-center flex-wrap"
+                            style="min-height: 40px;">
+                            <div class="d-flex align-items-center gap-3">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="text-muted">每页</span>
+                                    <input type="number" id="query-pagesize" class="form-control form-control-sm"
+                                        value="10" min="1" max="50" style="width: 70px;">
+                                    <span class="text-muted">条</span>
+                                </div>
+                                <div id="query-info" class="text-muted"></div>
+                            </div>
+                            <div id="query-pagination"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
-        <!-- 加载效果 -->
-        <div class="container mt-3 me-3 ms-3" style="display: none;" id="netload">
-            <button class="btn btn-primary">
-                <span class="spinner-border spinner-border-sm"></span>
-                Loading..
-            </button>
+
+        <!-- 批量查询页面 -->
+        <div id="batch-page" class="page">
+            <h2 class="mb-4"><i class="bi bi-list-check"></i> 批量查询</h2>
+
+            <div class="card" style="max-width: 1200px; margin: 0 auto;">
+                <div class="card-header">
+                    <i class="bi bi-gear"></i> 批量查询设置
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3 g-3">
+                        <div class="col-12 col-sm-6 col-md-4">
+                            <label class="form-label">查询类型</label>
+                            <select id="batch-type" class="form-select">
+                                <option value="web">域名</option>
+                                <option value="app">App</option>
+                                <option value="mapp">小程序</option>
+                                <option value="kapp">快应用</option>
+                                <option value="bweb">违规域名</option>
+                                <option value="bapp">违规App</option>
+                                <option value="bmapp">违规小程序</option>
+                                <option value="bkapp">违规快应用</option>
+                            </select>
+                        </div>
+                        <div class="col-12 col-sm-6 col-md-4">
+                            <label class="form-label">并发数量</label>
+                            <input type="number" id="batch-querynum" class="form-control" value="20" min="1" max="50">
+                            <small class="text-muted">建议10-30</small>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">查询内容（一行一个）</label>
+                        <textarea id="batch-content" class="form-control" rows="10"
+                            placeholder="请输入要查询的内容，每行一个&#10;例如：&#10;baidu.com&#10;sina.com.cn&#10;qq.com"></textarea>
+                    </div>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <button type="button" class="btn btn-primary px-4" onclick="startBatchQuery()">
+                            <i class="bi bi-play-fill"></i> 开始批量查询
+                        </button>
+                        <button type="button" class="btn btn-outline-danger" onclick="stopBatchQuery()">
+                            <i class="bi bi-stop-fill"></i> 终止任务
+                        </button>
+                        <button type="button" class="btn btn-outline-success" onclick="exportBatchData('excel')" title="导出Excel">
+                            <i class="bi bi-file-earmark-excel"></i> Excel
+                        </button>
+                        <button type="button" class="btn btn-outline-info" onclick="exportBatchData('json')" title="导出JSON">
+                            <i class="bi bi-filetype-json"></i> JSON
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 进度显示 -->
+            <div id="batch-progress-container" style="display: none;">
+                <div class="card mt-3" style="max-width: 1200px; margin: 0 auto;">
+                    <div class="card-header">
+                        <i class="bi bi-hourglass-split"></i> 任务进度
+                    </div>
+                    <div class="card-body">
+                        <p id="batch-progress-text" class="mb-3 text-center">准备开始...</p>
+                        <div class="progress" style="height: 25px;">
+                            <div id="batch-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated"
+                                role="progressbar" style="width: 0%">0%</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 历史记录页面 -->
+        <div id="history-page" class="page">
+            <h2 class="mb-4"><i class="bi bi-clock-history"></i> 历史记录</h2>
+
+            <div class="card">
+                <div class="card-header">
+                    <i class="bi bi-table"></i> 查询历史
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3 g-2">
+                        <div class="col-12 col-md-4">
+                            <input type="text" id="history-search" class="form-control" placeholder="搜索查询内容..."
+                                onkeypress="if(event.key === 'Enter') searchHistory()">
+                        </div>
+                        <div class="col-12 col-sm-6 col-md-3">
+                            <select id="history-filter" class="form-select" onchange="loadHistory(1, parseInt(document.getElementById('history-pagesize').value) || 20);">
+                                <option value="">全部类型</option>
+                                <option value="web">域名</option>
+                                <option value="app">App</option>
+                                <option value="mapp">小程序</option>
+                                <option value="kapp">快应用</option>
+                                <option value="bweb">违规域名</option>
+                                <option value="bapp">违规App</option>
+                                <option value="bmapp">违规小程序</option>
+                                <option value="bkapp">违规快应用</option>
+                            </select>
+                        </div>
+                        <div class="col-12 col-sm-6 col-md-5 text-end">
+                            <button type="button" class="btn btn-primary me-2" onclick="searchHistory()">
+                                <i class="bi bi-search"></i> 搜索
+                            </button>
+                            <button type="button" class="btn btn-success me-2" onclick="exportHistory('excel')" title="导出Excel">
+                                <i class="bi bi-file-earmark-excel"></i> Excel
+                            </button>
+                            <button type="button" class="btn btn-info me-2" onclick="exportHistory('json')" title="导出JSON">
+                                <i class="bi bi-filetype-json"></i> JSON
+                            </button>
+                            <button type="button" class="btn btn-outline-danger" onclick="clearHistory()">
+                                <i class="bi bi-trash"></i> 清空
+                            </button>
+                        </div>
+                    </div>
+                    <div id="history-table-container"></div>
+                    <div class="d-flex justify-content-between align-items-center mt-3 flex-wrap">
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="text-muted">每页</span>
+                                <input type="number" id="history-pagesize" class="form-control form-control-sm"
+                                    value="20" min="1" max="100" style="width: 70px;"
+                                    onchange="loadHistory(1, parseInt(this.value))">
+                                <span class="text-muted">条</span>
+                            </div>
+                            <div id="history-info" class="text-muted"></div>
+                        </div>
+                        <div id="history-pagination"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 批量任务历史页面 -->
+        <div id="batch-history-page" class="page">
+            <h2 class="mb-4"><i class="bi bi-archive"></i> 批量任务历史</h2>
+
+            <div class="card">
+                <div class="card-header">
+                    <i class="bi bi-table"></i> 任务列表
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3 g-2">
+                        <div class="col-12 col-md-4">
+                            <input type="text" id="batch-history-search" class="form-control" placeholder="搜索任务名称..."
+                                onkeypress="if(event.key === 'Enter') searchBatchHistory()">
+                        </div>
+                        <div class="col-12 col-sm-6 col-md-3">
+                            <select id="batch-history-filter" class="form-select" onchange="loadBatchHistory(1, parseInt(document.getElementById('batch-history-pagesize').value) || 20);">
+                                <option value="">全部状态</option>
+                                <option value="running">进行中</option>
+                                <option value="completed">已完成</option>
+                                <option value="failed">失败</option>
+                            </select>
+                        </div>
+                        <div class="col-12 col-sm-6 col-md-5 text-end">
+                            <button type="button" class="btn btn-primary me-2" onclick="searchBatchHistory()">
+                                <i class="bi bi-search"></i> 搜索
+                            </button>
+                            <button type="button" class="btn btn-success me-2" onclick="refreshBatchHistory()">
+                                <i class="bi bi-arrow-clockwise"></i> 刷新
+                            </button>
+                        </div>
+                    </div>
+                    <div id="batch-history-table-container"></div>
+                    <div class="d-flex justify-content-between align-items-center mt-3 flex-wrap">
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="text-muted">每页</span>
+                                <input type="number" id="batch-history-pagesize" class="form-control form-control-sm"
+                                    value="20" min="1" max="100" style="width: 70px;"
+                                    onchange="loadBatchHistory(1, parseInt(this.value))">
+                                <span class="text-muted">条</span>
+                            </div>
+                            <div id="batch-history-info" class="text-muted"></div>
+                        </div>
+                        <div id="batch-history-pagination"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 系统日志页面 -->
+        <div id="logs-page" class="page">
+            <h2 class="mb-4"><i class="bi bi-file-text"></i> 实时系统日志</h2>
+
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-terminal"></i> 运行日志</span>
+                    <div>
+                        <div class="form-check form-switch d-inline-block me-3">
+                            <input class="form-check-input" type="checkbox" id="auto-refresh-logs" checked>
+                            <label class="form-check-label" for="auto-refresh-logs">
+                                自动刷新 (3秒)
+                            </label>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-secondary me-2" onclick="clearRealtimeLogs()">
+                            <i class="bi bi-trash"></i> 清空
+                        </button>
+                        <button type="button" class="btn btn-sm btn-primary" onclick="loadRealtimeLogs()">
+                            <i class="bi bi-arrow-clockwise"></i> 手动刷新
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body p-0" style="background: #1e1e1e;">
+                    <div id="log-content"
+                        style="color: #d4d4d4; padding: 15px; max-height: 700px; overflow-y: auto; font-family: 'Consolas', 'Monaco', monospace; font-size: 13px; line-height: 1.6;">
+                        <div class="text-muted text-center py-5">
+                            <i class="bi bi-hourglass-split" style="font-size: 48px;"></i>
+                            <p class="mt-3">等待日志加载...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 配置管理页面 -->
+        <div id="config-page" class="page">
+            <h2 class="mb-4"><i class="bi bi-gear-fill"></i> 配置管理</h2>
+
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle-fill"></i>
+                <strong>提示：</strong>修改配置后需要重启服务才能生效。
+            </div>
+
+            <!-- 系统配置 -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <i class="bi bi-server"></i> 系统配置
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">监听地址</label>
+                            <input type="text" id="cfg-host" class="form-control" placeholder="0.0.0.0">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">监听端口</label>
+                            <input type="number" id="cfg-port" class="form-control" placeholder="16181">
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label">HTTP超时时间(秒)</label>
+                            <input type="number" id="cfg-http-timeout" class="form-control" placeholder="5">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">详情并发数</label>
+                            <input type="number" id="cfg-detail-concurrency" class="form-control" placeholder="5">
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-check mt-4">
+                                <input class="form-check-input" type="checkbox" id="cfg-web-ui">
+                                <label class="form-check-label" for="cfg-web-ui">
+                                    启用Web界面
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 验证码配置 -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <i class="bi bi-shield-check"></i> 验证码配置
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="cfg-captcha-enable">
+                                <label class="form-check-label" for="cfg-captcha-enable">
+                                    启用验证码识别
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">失败重试次数</label>
+                            <input type="number" id="cfg-retry-times" class="form-control" placeholder="2">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">识别方式</label>
+                            <select id="cfg-coding-code" class="form-select">
+                                <option value="auto">自动识别</option>
+                                <option value="labour">人工识别</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 代理配置 -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <i class="bi bi-globe"></i> 代理配置
+                </div>
+                <div class="card-body">
+                    <h6 class="mb-3">隧道代理</h6>
+                    <div class="mb-3">
+                        <label class="form-label">代理URL (格式: http://user:pass@host:port)</label>
+                        <input type="text" id="cfg-tunnel-url" class="form-control" placeholder="留空则不使用隧道代理">
+                    </div>
+
+                    <hr>
+                    <h6 class="mb-3">API提取代理</h6>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">提取API地址</label>
+                            <input type="text" id="cfg-extra-api-url" class="form-control" placeholder="留空则不使用API代理">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">提取间隔(秒)</label>
+                            <input type="number" id="cfg-extra-interval" class="form-control" placeholder="3">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">代理池大小</label>
+                            <input type="number" id="cfg-pool-num" class="form-control" placeholder="100">
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="cfg-auto-maintenace">
+                                <label class="form-check-label" for="cfg-auto-maintenace">
+                                    自动维护代理池
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="cfg-check-proxy">
+                                <label class="form-check-label" for="cfg-check-proxy">
+                                    入库前检测代理
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 日志配置 -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <i class="bi bi-journal-text"></i> 日志配置
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="cfg-save-log">
+                                <label class="form-check-label" for="cfg-save-log">
+                                    保存日志到文件
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="cfg-output-console">
+                                <label class="form-check-label" for="cfg-output-console">
+                                    输出到控制台
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">保留天数</label>
+                            <input type="number" id="cfg-backup-count" class="form-control" placeholder="7">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="text-end">
+                <button type="button" class="btn btn-secondary btn-lg me-2" onclick="loadConfig()">
+                    <i class="bi bi-arrow-clockwise"></i> 重新加载
+                </button>
+                <button type="button" class="btn btn-primary btn-lg" onclick="saveConfig()">
+                    <i class="bi bi-save"></i> 保存配置
+                </button>
+            </div>
+        </div>
+
+        <!-- 关于页面 -->
+        <div id="about-page" class="page">
+            <h2 class="mb-4"><i class="bi bi-info-circle"></i> 关于系统</h2>
+
+            <div class="card">
+                <div class="card-header">
+                    <i class="bi bi-file-text"></i> 系统信息
+                </div>
+                <div class="card-body">
+                    <h4>ICP备案批量查询系统</h4>
+                    <p class="text-muted">版本：2.0.0</p>
+                    <hr>
+                    <h5>功能特性</h5>
+                    <ul>
+                        <li>支持域名、App、小程序、快应用的ICP备案查询</li>
+                        <li>支持违规域名、App、小程序、快应用的查询</li>
+                        <li>批量查询功能，支持多个内容同时查询</li>
+                        <li>历史记录管理，方便查看以往查询记录</li>
+                        <li>数据导出功能，支持导出为Excel格式</li>
+                        <li>现代化的界面设计，提供更好的用户体验</li>
+                    </ul>
+                    <hr>
+                    <h5>使用说明</h5>
+                    <p>1. <strong>单个查询</strong>：选择查询类型，输入查询内容，点击查询按钮即可。</p>
+                    <p>2. <strong>批量查询</strong>：在文本框中输入多个查询内容（每行一个），设置并发数量后开始查询。</p>
+                    <p>3. <strong>历史记录</strong>：查看所有查询历史，支持按类型筛选和导出。</p>
+                </div>
+            </div>
         </div>
     </div>
 
-    <!-- 输出结果 -->
-    <div class="container text-left mt-3 content">
-        <div id="query_result" class="table-responsive"></div>
+    <!-- 加载遮罩 -->
+    <div id="spinner-overlay" class="spinner-overlay">
+        <div class="spinner-content">
+            <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mb-0">加载中...</p>
+        </div>
     </div>
 
-    <!-- 引用bootstrap -->
-    <!-- 5.3.0js部分问题，暂时引用低版本 -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"
-        integrity="sha384-kenU1KFdBIe4zVF0s0G1M5b4hcpxyD9F7jL+jjXkk+Q2h455rYXK/7HAuoJl+0I4"
-        crossorigin="anonymous"></script>
+    <!-- Toast 消息提示 -->
+    <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 11000;">
+        <div id="toast" class="toast" role="alert">
+            <div class="toast-header">
+                <strong class="me-auto" id="toast-title">提示</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+            </div>
+            <div class="toast-body" id="toast-body">
+                消息内容
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
-    <!-- 提交查询数据 -->
     <script>
-        function getIcpInfo() {
-            // 获取输入数据
-            var query_value = document.getElementById("query_value").value;
-            var inputList = query_value.split('\n').filter(line => line.trim() !== '');
-            // 获取允许同时查询的数量
-            var querynum = document.getElementById('querynum').value;
-            // 获取进度条
-            var progresshome = document.getElementById("prohome");
-            var progress = document.getElementById("pro");
-            // 进度条数值
-            var progressvalue = document.getElementById("provalue");
-            // 任务类型
-            var dropdown = document.getElementById('dropdown').value;
+        // 全局变量
+        let currentPage = 'query';
+        let currentTask = null;
+        let currentQueryData = null;
+        let logRefreshInterval = null;
 
-            if (!query_value) {
-                eralert("查询内容为空");
+        // 切换侧边栏显示/隐藏（移动端）
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+            
+            sidebar.classList.toggle('show');
+            overlay.classList.toggle('show');
+        }
+
+        // 显示页面
+        function showPage(pageName, event) {
+            // 阻止默认事件，防止页面跳转或刷新
+            if (event) {
+                event.preventDefault();
+            }
+
+            // 隐藏所有页面
+            document.querySelectorAll('.page').forEach(page => {
+                page.classList.remove('active');
+            });
+
+            // 更新导航状态
+            document.querySelectorAll('.nav-link').forEach(link => {
+                link.classList.remove('active');
+            });
+
+            // 显示选中的页面
+            document.getElementById(pageName + '-page').classList.add('active');
+
+            // 如果有事件对象，更新对应的导航链接状态
+            if (event && event.target) {
+                const navLink = event.target.closest('.nav-link');
+                if (navLink) {
+                    navLink.classList.add('active');
+                }
+            } else {
+                // 如果没有事件对象，通过页面名称找到对应的导航链接
+                document.querySelectorAll('.nav-link').forEach(link => {
+                    if (link.getAttribute('onclick') && link.getAttribute('onclick').includes(`'${pageName}'`)) {
+                        link.classList.add('active');
+                    }
+                });
+            }
+
+            currentPage = pageName;
+
+            // 移动端：切换页面后自动关闭侧边栏
+            if (window.innerWidth <= 768) {
+                const sidebar = document.getElementById('sidebar');
+                const overlay = document.getElementById('sidebar-overlay');
+                sidebar.classList.remove('show');
+                overlay.classList.remove('show');
+            }
+
+            // 根据页面加载相应数据
+            if (pageName === 'history') {
+                const historyPageSize = parseInt(document.getElementById('history-pagesize')?.value) || 20;
+                loadHistory(1, historyPageSize);
+            } else if (pageName === 'batch-history') {
+                const batchHistoryPageSize = parseInt(document.getElementById('batch-history-pagesize')?.value) || 20;
+                loadBatchHistory(1, batchHistoryPageSize);
+            } else if (pageName === 'logs') {
+                initLogPage();
+            } else if (pageName === 'config') {
+                loadConfig();
+            } else {
+                // 离开日志页面时停止自动刷新
+                if (logRefreshInterval) {
+                    clearInterval(logRefreshInterval);
+                    logRefreshInterval = null;
+                }
+            }
+        }
+
+        // 显示/隐藏加载动画
+        function showLoading(show = true) {
+            const overlay = document.getElementById('spinner-overlay');
+            if (show) {
+                overlay.classList.add('show');
+            } else {
+                overlay.classList.remove('show');
+            }
+        }
+
+        // 显示消息提示
+        function showToast(message, type = 'info', title = '提示') {
+            const toastEl = document.getElementById('toast');
+            const toastBody = document.getElementById('toast-body');
+            const toastTitle = document.getElementById('toast-title');
+            const toast = new bootstrap.Toast(toastEl);
+
+            toastTitle.textContent = title;
+            toastBody.textContent = message;
+
+            // 根据类型设置样式
+            toastEl.className = 'toast';
+            if (type === 'success') {
+                toastEl.classList.add('bg-success', 'text-white');
+                toastTitle.textContent = '成功';
+            } else if (type === 'error') {
+                toastEl.classList.add('bg-danger', 'text-white');
+                toastTitle.textContent = '错误';
+            } else if (type === 'warning') {
+                toastEl.classList.add('bg-warning');
+                toastTitle.textContent = '警告';
+            }
+
+            toast.show();
+        }
+
+        // HTTP请求封装
+        async function httpRequest(method, url, data = null) {
+            try {
+                showLoading(true);
+                const options = {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                };
+
+                if (data) {
+                    options.body = JSON.stringify(data);
+                }
+
+                const response = await fetch(url, options);
+                const result = await response.json();
+
+                showLoading(false);
+                return result;
+            } catch (error) {
+                showLoading(false);
+                throw error;
+            }
+        }
+
+        // 单个查询功能
+        async function performQuery(pageNum = null) {
+            const type = document.getElementById('query-type').value;
+            const keyword = document.getElementById('query-keyword').value.trim();
+            const pageNumInput = pageNum || 1;  // 默认第1页
+            const pageSize = document.getElementById('query-pagesize').value;
+
+            if (!keyword) {
+                showToast('请输入查询内容', 'warning');
                 return;
             }
 
-            progresshome.style.display = '';
-            progressvalue.textContent = '';
-            progressvalue.style.display = '';
-            progress.style.width = '0%';
-            const timeStamp = new Date().getTime();
-            const taskname = `icp_${dropdown}_${timeStamp}`;
-            window.taskname = taskname;
-            var jsonData = JSON.stringify({
-                "task": taskname,
-                "data": inputList,
-                "type": dropdown,
-                "querynum": querynum
+            try {
+                const result = await httpRequest('GET',
+                    `/query/${type}?search=${encodeURIComponent(keyword)}&pageNum=${pageNumInput}&pageSize=${pageSize}`);
+
+                if (result.code === 200) {
+                    displayQueryResult(result.params, type, pageNumInput, pageSize);
+                    showToast('查询成功', 'success');
+                } else {
+                    showToast(result.msg || result.message || '查询失败', 'error');
+                }
+            } catch (error) {
+                showToast('查询出错：' + error.message, 'error');
+            }
+        }
+
+        // 显示查询结果
+        function displayQueryResult(data, type, currentPage = 1, pageSize = 10) {
+            const container = document.getElementById('query-result-container');
+            const tableContainer = document.getElementById('query-result-table');
+            const paginationContainer = document.getElementById('query-pagination');
+
+            if (!data || (data.list && data.list.length === 0) || (Array.isArray(data) && data.length === 0)) {
+                tableContainer.innerHTML = '<div class="empty-state"><i class="bi bi-inbox"></i><p>暂无数据</p></div>';
+                paginationContainer.innerHTML = '';
+                container.style.display = 'block';
+                return;
+            }
+
+            const list = data.list || data;
+            let html = '<div class="table-responsive"><table class="table table-hover"><thead><tr>';
+
+            // 根据类型生成表头
+            if (type === 'web') {
+                html += '<th>域名</th><th>主办单位</th><th>备案号</th><th>负责人</th><th>更新时间</th>';
+            } else if (['app', 'mapp', 'kapp'].includes(type)) {
+                html += '<th>名称</th><th>主办单位</th><th>备案号</th><th>负责人</th><th>更新时间</th>';
+            } else {
+                html += '<th>名称</th><th>违规级别</th>';
+            }
+
+            html += '</tr></thead><tbody>';
+
+            // 生成表格行
+            list.forEach(item => {
+                html += '<tr>';
+                if (type === 'web') {
+                    html += `<td>${item.domain || '-'}</td>`;
+                    html += `<td>${item.unitName || '-'}</td>`;
+                    html += `<td>${item.serviceLicence || '-'}</td>`;
+                    html += `<td>${item.leaderName || '-'}</td>`;
+                    html += `<td>${item.updateRecordTime || '-'}</td>`;
+                } else if (['app', 'mapp', 'kapp'].includes(type)) {
+                    html += `<td>${item.serviceName || '-'}</td>`;
+                    html += `<td>${item.unitName || '-'}</td>`;
+                    html += `<td>${item.serviceLicence || '-'}</td>`;
+                    html += `<td>${item.leaderName || '-'}</td>`;
+                    html += `<td>${item.updateRecordTime || '-'}</td>`;
+                } else {
+                    html += `<td>${item.serviceName || '-'}</td>`;
+                    html += `<td><span class="badge bg-danger">${item.blacklistLevel || '-'}</span></td>`;
+                }
+                html += '</tr>';
             });
-            http('POST', '/create/task', jsonData)
-                .then(function (data) {
-                    sualert(`已提交任务 ${taskname} 请耐心等待任务完成`);
-                })
-                .catch(function (error) {
-                    eralert(error);
-                    console.log(error);
-                })
-            async function loop() {
-                while (true) {
-                    try {
-                        const data = await http('GET', `/query/task?taskname=${taskname}`);
-                        const parsedData = JSON.parse(data);
-                        progressvalue.textContent = `任务 ${taskname} 当前进度：${parsedData.curpro} / ${parsedData.numpro}`;
-                        progress.style.width = `${parsedData.progress}%`
-                        if (parsedData.code == 404) {
-                            progressvalue.textContent = '任务不存在';
-                            progresshome.style.display = none;
-                            progress.style.width = '0%';
-                            progress.style.display = none;
-                            break;
-                        }
-                        // 检查条件并在条件符合时跳出循环
-                        if (parsedData.progress === 100) {
-                            sualert("全部查询完成");
-                            progressvalue.textContent = `任务 ${taskname} 查询完成：${parsedData.curpro} / ${parsedData.numpro} 请直接导出`;
-                            window.querydata = parsedData;
-                            break;
-                        }
-                    } catch (error) {
-                        console.log(error);
-                        eralert("任务异常" + error);
+
+            html += '</tbody></table></div>';
+            tableContainer.innerHTML = html;
+
+            // 判断是否需要显示分页
+            const total = data.total || list.length;
+            const infoContainer = document.getElementById('query-info');
+            
+            // 如果只有一个结果，隐藏所有分页和统计信息
+            if (total === 1) {
+                infoContainer.textContent = '';
+                paginationContainer.innerHTML = '';
+            }
+            // 如果有分页信息且页数大于1，显示分页控件
+            else if (data.pages && data.pages > 1) {
+                const totalPages = data.pages;
+
+                // 显示统计信息（带页码输入框）
+                infoContainer.innerHTML = `共 ${total} 条，第 
+                    <input type="number" class="form-control form-control-sm d-inline-block" 
+                           min="1" max="${totalPages}" value="${currentPage}" 
+                           style="width: 60px; text-align: center;" 
+                           onkeypress="if(event.key === 'Enter') { const page = parseInt(this.value); if(page >= 1 && page <= ${totalPages} && page !== ${currentPage}) performQuery(page); else this.value = ${currentPage}; }"
+                           onblur="const page = parseInt(this.value); if(page >= 1 && page <= ${totalPages} && page !== ${currentPage}) performQuery(page); else this.value = ${currentPage};">
+                    /${totalPages} 页`;
+
+                // 显示分页按钮
+                let paginationHtml = '<ul class="pagination pagination-sm">';
+
+                // 上一页
+                paginationHtml += `<li class="page-item ${currentPage == 1 ? 'disabled' : ''}">
+                    <a class="page-link" href="#" onclick="event.preventDefault(); ${currentPage > 1 ? `performQuery(${currentPage - 1})` : ''}">
+                        <i class="bi bi-chevron-left"></i>
+                    </a>
+                </li>`;
+
+                // 页码
+                const maxPages = 5;
+                let startPage = Math.max(1, currentPage - Math.floor(maxPages / 2));
+                let endPage = Math.min(totalPages, startPage + maxPages - 1);
+
+                if (endPage - startPage < maxPages - 1) {
+                    startPage = Math.max(1, endPage - maxPages + 1);
+                }
+
+                if (startPage > 1) {
+                    paginationHtml += `<li class="page-item"><a class="page-link" href="#" onclick="event.preventDefault(); performQuery(1)">1</a></li>`;
+                    if (startPage > 2) {
+                        paginationHtml += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+                    }
+                }
+
+                for (let i = startPage; i <= endPage; i++) {
+                    paginationHtml += `<li class="page-item ${i == currentPage ? 'active' : ''}">
+                        <a class="page-link" href="#" onclick="event.preventDefault(); performQuery(${i})">${i}</a>
+                    </li>`;
+                }
+
+                if (endPage < totalPages) {
+                    if (endPage < totalPages - 1) {
+                        paginationHtml += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+                    }
+                    paginationHtml += `<li class="page-item"><a class="page-link" href="#" onclick="event.preventDefault(); performQuery(${totalPages})">${totalPages}</a></li>`;
+                }
+
+                // 下一页
+                paginationHtml += `<li class="page-item ${currentPage == totalPages ? 'disabled' : ''}">
+                    <a class="page-link" href="#" onclick="event.preventDefault(); ${currentPage < totalPages ? `performQuery(${parseInt(currentPage) + 1})` : ''}">
+                        <i class="bi bi-chevron-right"></i>
+                    </a>
+                </li>`;
+
+                paginationHtml += '</ul>';
+                paginationContainer.innerHTML = paginationHtml;
+            } else {
+                // 多于一个结果但只有一页时，显示统计信息
+                if (total > 1) {
+                    infoContainer.textContent = `共 ${total} 条`;
+                } else {
+                    infoContainer.textContent = '';
+                }
+                paginationContainer.innerHTML = '';
+            }
+
+            container.style.display = 'block';
+        }
+
+        // 批量查询功能
+        async function startBatchQuery() {
+            const content = document.getElementById('batch-content').value.trim();
+            const type = document.getElementById('batch-type').value;
+            const querynum = document.getElementById('batch-querynum').value;
+
+            if (!content) {
+                showToast('请输入查询内容', 'warning');
+                return;
+            }
+
+            const inputList = content.split('\n').filter(line => line.trim() !== '');
+            const timeStamp = new Date().getTime();
+            const taskname = `icp_${type}_${timeStamp}`;
+            currentTask = taskname;
+
+            try {
+                const result = await httpRequest('POST', '/create/task', {
+                    task: taskname,
+                    data: inputList,
+                    type: type,
+                    querynum: parseInt(querynum)
+                });
+
+                if (result.code === 200) {
+                    showToast('任务已创建，开始执行', 'success');
+                    document.getElementById('batch-progress-container').style.display = 'block';
+                    monitorBatchTask(taskname, type);
+                } else {
+                    showToast(result.message || '创建任务失败', 'error');
+                }
+            } catch (error) {
+                showToast('创建任务出错：' + error.message, 'error');
+            }
+        }
+
+        // 监控批量任务进度
+        async function monitorBatchTask(taskname, type) {
+            const progressText = document.getElementById('batch-progress-text');
+            const progressBar = document.getElementById('batch-progress-bar');
+
+            while (true) {
+                try {
+                    const result = await fetch(`/query/task?taskname=${taskname}`).then(r => r.json());
+
+                    if (result.code === 404) {
+                        progressText.textContent = '任务不存在或已删除';
                         break;
                     }
-                    await new Promise(resolve => setTimeout(resolve, 1500));
+
+                    if (result.code === 200) {
+                        const progress = result.progress;
+                        progressText.textContent = `任务进度：${result.curpro} / ${result.numpro}`;
+                        progressBar.style.width = progress + '%';
+                        progressBar.textContent = progress + '%';
+
+                        if (progress >= 100) {
+                            showToast('批量查询已完成', 'success');
+                            currentQueryData = result;
+                            progressBar.classList.remove('progress-bar-animated');
+                            break;
+                        }
+                    }
+                } catch (error) {
+                    console.error('监控任务出错：', error);
+                    break;
                 }
+
+                await new Promise(resolve => setTimeout(resolve, 1500));
             }
-            // 立即执行异步函数
-            (async () => {
-                await loop();
-            })();
         }
 
-        function deletetask() {
-            const taskname = window.taskname;
-            var jsonData = JSON.stringify({ "task": taskname });
-            http('POST', '/delete/task', jsonData)
-                .then(function (data) {
-                    const parsedData = JSON.parse(data);
-                    if (parsedData.code === 200) {
-                        sualert("删除任务成功");
-                        progressvalue.textContent = `任务 ${taskname} 已删除`;
-                        return;
-                    }
-                    if (parsedData.code === 404) {
-                        sualert("删除不存在");
-                        return;
-                    }
+        // 停止批量查询
+        async function stopBatchQuery() {
+            if (!currentTask) {
+                showToast('没有正在运行的任务', 'warning');
+                return;
+            }
 
-                    eralert("删除任务失败");
-                })
-                .catch(function (error) {
-                    eralert(error);
-                    console.log(error);
-                })
-        }
-    </script>
+            try {
+                const result = await httpRequest('POST', '/delete/task', { task: currentTask });
 
-    <!-- 工具封装 -->
-    <script>
-        // 加载框
-        const netload = document.getElementById('netload');
-        // 消息框
-        const alertPlaceholder = document.getElementById('liveAlertPlaceholder');
-        const alert = (message, type) => {
-            const wrapper = document.createElement('div');
-            wrapper.innerHTML = [
-                `<div class="alert alert-${type} alert-dismissible fade show" role="alert">`,
-                `   <div>${message}</div>`,
-                '   <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>',
-                '</div>'
-            ].join('');
-            alertPlaceholder.append(wrapper);
-            setTimeout(() => {
-                const closeButton = wrapper.querySelector('[aria-label="Close"]');
-                closeButton.click();
-            }, 3000);
-        }
-
-        // 封装一下错误消息
-        const eralert = (message) => {
-            alert(message, 'danger');
-        }
-        // 成功消息
-        const sualert = (message) => {
-            alert(message, 'success');
-        }
-
-        // 网络工具包
-        function http(type, url, data, header) {
-            netload.style.display = 'block';
-            return new Promise(function (resolve, reject) {
-                var xhr = new XMLHttpRequest();
-                xhr.open(type, url);
-                if (header) {
-                    xhr.setRequestHeader('Content-Type', 'application/json');
-                }
-                xhr.onload = function () {
-                    if (xhr.status === 200) {
-                        netload.style.display = 'none';
-                        resolve(xhr.responseText); // 将响应文本作为参数传递给 resolve 方法
-                    } else {
-                        netload.style.display = 'none';
-                        reject(new Error(xhr.statusText)); // 创建并返回一个新的 Error 对象
-                    }
-                };
-                xhr.onerror = function () {
-                    netload.style.display = 'none';
-                    reject(new Error("Network Error")); // 创建并返回一个新的 Error 对象
-                };
-                if (!data) {
-                    xhr.send();
+                if (result.code === 200) {
+                    showToast('任务已终止', 'success');
+                    currentTask = null;
+                    document.getElementById('batch-progress-bar').classList.remove('progress-bar-animated');
                 } else {
-                    xhr.send(data);
+                    showToast(result.message || '终止任务失败', 'error');
+                }
+            } catch (error) {
+                showToast('终止任务出错：' + error.message, 'error');
+            }
+        }
+
+        // 导出批量数据
+        function exportBatchData(format = 'excel') {
+            if (!currentQueryData || !currentQueryData.data) {
+                showToast('没有可导出的数据', 'warning');
+                return;
+            }
+
+            const type = currentQueryData.tasktype;
+            const listArray = currentQueryData.data;
+
+            if (listArray.length === 0 || !listArray[0] || !listArray[0][0]) {
+                showToast('没有可导出的数据', 'warning');
+                return;
+            }
+
+            // JSON格式导出
+            if (format === 'json') {
+                const jsonData = {
+                    task_type: type,
+                    total_count: listArray.length,
+                    data: listArray.map(item => item[0]).filter(item => item)
+                };
+                const blob = new Blob([JSON.stringify(jsonData, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${currentTask || 'batch_export'}_${new Date().getTime()}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+                showToast('导出成功', 'success');
+                return;
+            }
+
+            // 获取第一条数据的所有字段作为表头
+            const firstItem = listArray[0][0];
+            const headers = Object.keys(firstItem);
+
+            // 字段中文映射
+            const fieldMapping = {
+                // Web相关
+                'contentTypeName': '内容类型',
+                'domain': '域名',
+                'domainId': '域名ID',
+                'leaderName': '负责人',
+                'limitAccess': '限制访问',
+                'mainId': '主体ID',
+                'mainLicence': '主体许可证号',
+                'natureName': '单位性质',
+                'serviceId': '服务ID',
+                'serviceLicence': '服务许可证号',
+                'unitName': '主办单位',
+                'updateRecordTime': '更新时间',
+                // App相关
+                'cityId': '城市ID',
+                'countyId': '区县ID',
+                'dataId': '数据ID',
+                'mainUnitAddress': '主体地址',
+                'mainUnitCertNo': '主体证件号',
+                'mainUnitCertType': '主体证件类型',
+                'natureId': '性质ID',
+                'provinceId': '省份ID',
+                'serviceName': '服务名称',
+                'serviceType': '服务类型',
+                'version': '版本',
+                // 违规相关
+                'blacklistLevel': '违规级别'
+            };
+
+            // 生成表头（使用中文映射，如果没有映射则使用原字段名）
+            const headerRow = headers.map(key => fieldMapping[key] || key);
+            const data = [headerRow];
+
+            // 生成数据行
+            listArray.forEach(item => {
+                if (item[0]) {
+                    const row = headers.map(key => item[0][key] || '');
+                    data.push(row);
                 }
             });
+
+            // 使用SheetJS导出
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.aoa_to_sheet(data);
+
+            // 自动调整列宽
+            const colWidths = headers.map((key, index) => {
+                const maxLength = Math.max(
+                    headerRow[index].length,
+                    ...data.slice(1).map(row => String(row[index] || '').length)
+                );
+                return { wch: Math.min(maxLength + 2, 50) };
+            });
+            ws['!cols'] = colWidths;
+
+            XLSX.utils.book_append_sheet(wb, ws, '查询结果');
+            XLSX.writeFile(wb, `${currentTask || 'batch_export'}_${new Date().getTime()}.xlsx`);
+
+            showToast('导出成功', 'success');
         }
-    </script>
 
-    <script>
-        var xlsx = XLSX;
-        function exportData() {
-            // 获取列表元素和所有的列表项元素
-            var listArray = window.querydata.data;
-            var data = [];
-            if (window.querydata.tasktype == "web") {
+        // 加载历史记录
+        async function loadHistory(page = 1, limit = 20) {
+            const type = document.getElementById('history-filter').value;
+            const searchKeyword = document.getElementById('history-search').value.trim();
+            const offset = (page - 1) * limit;
 
-                // 定义一个空数组，用于保存所有数据
-                data.push(["contentTypeName", "domain", "domainId", "leaderName",
-                    "limitAccess", "mainId", "mainLicence", "natureName",
-                    "serviceId", "serviceLicence", "unitName", "updateRecordTime"]);
-                // 循环遍历列表项元素，将数据添加到数组中
-                listArray.forEach(function (item) {
-                    // 获取文本内容和状态
-                    // 将数据添加到数组中
-                    data.push([item[0].contentTypeName, item[0].domain, item[0].domainId, item[0].leaderName,
-                    item[0].limitAccess, item[0].mainId, item[0].mainLicence, item[0].natureName, item[0].serviceId,
-                    item[0].serviceLicence, item[0].unitName, item[0].updateRecordTime]);
-                });
+            try {
+                let url = `/history?limit=${limit}&offset=${offset}`;
+                if (type) {
+                    url += `&type=${type}`;
+                }
+
+                const result = await httpRequest('GET', url);
+
+                if (result.code === 200) {
+                    let filteredData = result.data;
+                    let filteredTotal = result.total;
+
+                    // 客户端搜索过滤
+                    if (searchKeyword) {
+                        filteredData = result.data.filter(item =>
+                            item.search_keyword.toLowerCase().includes(searchKeyword.toLowerCase())
+                        );
+                        filteredTotal = filteredData.length;
+                    }
+
+                    displayHistory(filteredData, filteredTotal, page, limit);
+                } else {
+                    showToast('加载历史记录失败', 'error');
+                }
+            } catch (error) {
+                showToast('加载历史记录出错：' + error.message, 'error');
             }
-            if (window.querydata.tasktype === "app" || window.querydata.tasktype === "mapp" || window.querydata.tasktype === "kapp") {
-                // 定义一个空数组，用于保存所有数据
-                data.push(["cityId", "countyId", "dataId", "leaderName",
-                    "mainId", "mainLicence", "mainUnitAddress", "mainUnitCertNo",
-                    "mainUnitCertType", "natureId", "natureName", "provinceId",
-                    "serviceId", "serviceLicence", "serviceName", "serviceType",
-                    "unitName", "updateRecordTime", "version"]);
-
-                // 循环遍历列表项元素，将数据添加到数组中
-                listArray.forEach(function (item) {
-                    // 获取文本内容和状态
-                    // 将数据添加到数组中
-                    data.push([item[0].cityId, item[0].countyId, item[0].dataId,
-                    item[0].leaderName, item[0].mainId, item[0].mainLicence, item[0].mainUnitAddress,
-                    item[0].mainUnitCertNo, item[0].mainUnitCertType, item[0].natureId, item[0].natureName,
-                    item[0].provinceId, item[0].serviceId, item[0].serviceLicence, item[0].serviceName, item[0].serviceType,
-                    item[0].unitName, item[0].updateRecordTime, item[0].version]);
-                });
-            }
-
-            if (window.querydata.tasktype === "bapp" || window.querydata.tasktype === "bweb" || window.querydata.tasktype === "bkapp" || window.querydata.tasktype === "bmapp") {
-                // 定义一个空数组，用于保存所有数据
-                data.push(["blacklistLevel", "serviceName"]);
-                // 循环遍历列表项元素，将数据添加到数组中
-                listArray.forEach(function (item) {
-                    // 获取文本内容和状态
-                    // 将数据添加到数组中
-                    data.push([item[0].blacklistLevel, item[0].serviceName]);
-                });
-            }
-            // 定义一个新的工作簿对象
-            var wb = xlsx.utils.book_new();
-
-            // 将数据添加到工作簿中
-            var ws = xlsx.utils.aoa_to_sheet(data);
-            xlsx.utils.book_append_sheet(wb, ws);
-
-            // 生成并下载文件
-            xlsx.writeFile(wb, `${window.taskname}.xlsx`);
         }
+
+        // 搜索历史记录
+        function searchHistory() {
+            const pageSize = parseInt(document.getElementById('history-pagesize').value) || 20;
+            loadHistory(1, pageSize);
+        }
+
+        // 导出历史记录
+        async function exportHistory(format = 'excel') {
+            const type = document.getElementById('history-filter').value;
+
+            try {
+                // 获取所有历史记录
+                let url = `/history?limit=10000&offset=0`;
+                if (type) {
+                    url += `&type=${type}`;
+                }
+
+                const result = await httpRequest('GET', url);
+
+                if (result.code === 200 && result.data && result.data.length > 0) {
+                    const typeNames = {
+                        'web': '域名',
+                        'app': 'App',
+                        'mapp': '小程序',
+                        'kapp': '快应用',
+                        'bweb': '违规域名',
+                        'bapp': '违规App',
+                        'bmapp': '违规小程序',
+                        'bkapp': '违规快应用'
+                    };
+
+                    // JSON格式导出
+                    if (format === 'json') {
+                        const jsonData = result.data.map(item => ({
+                            id: item.id,
+                            type: typeNames[item.search_type] || item.search_type,
+                            search_keyword: item.search_keyword,
+                            result_count: item.result_count,
+                            search_time: item.search_time
+                        }));
+                        const blob = new Blob([JSON.stringify(jsonData, null, 2)], { type: 'application/json' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `查询历史_${new Date().getTime()}.json`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                        showToast('导出成功', 'success');
+                        return;
+                    }
+
+                    // Excel格式导出
+                    const data = [['ID', '类型', '查询内容', '结果数', '查询时间']];
+
+                    result.data.forEach(item => {
+                        data.push([
+                            item.id,
+                            typeNames[item.search_type] || item.search_type,
+                            item.search_keyword,
+                            item.result_count,
+                            item.search_time
+                        ]);
+                    });
+
+                    const wb = XLSX.utils.book_new();
+                    const ws = XLSX.utils.aoa_to_sheet(data);
+                    XLSX.utils.book_append_sheet(wb, ws, '查询历史');
+                    XLSX.writeFile(wb, `查询历史_${new Date().getTime()}.xlsx`);
+
+                    showToast('导出成功', 'success');
+                } else {
+                    showToast('暂无数据可导出', 'warning');
+                }
+            } catch (error) {
+                showToast('导出出错：' + error.message, 'error');
+            }
+        }
+
+        // 显示历史记录
+        function displayHistory(historyList, total, page, limit) {
+            const container = document.getElementById('history-table-container');
+
+            if (!historyList || historyList.length === 0) {
+                container.innerHTML = '<div class="empty-state"><i class="bi bi-inbox"></i><p>暂无历史记录</p></div>';
+                return;
+            }
+
+            const typeNames = {
+                'web': '域名',
+                'app': 'App',
+                'mapp': '小程序',
+                'kapp': '快应用',
+                'bweb': '违规域名',
+                'bapp': '违规App',
+                'bmapp': '违规小程序',
+                'bkapp': '违规快应用'
+            };
+
+            let html = '<div class="table-responsive"><table class="table table-hover"><thead><tr>';
+            html += '<th>ID</th><th>类型</th><th>查询内容</th><th>结果数</th><th>查询时间</th><th>操作</th>';
+            html += '</tr></thead><tbody>';
+
+            historyList.forEach(item => {
+                html += '<tr>';
+                html += `<td>${item.id}</td>`;
+                html += `<td><span class="badge bg-primary">${typeNames[item.search_type] || item.search_type}</span></td>`;
+                html += `<td>${item.search_keyword}</td>`;
+                html += `<td>${item.result_count}</td>`;
+                html += `<td>${item.search_time}</td>`;
+                html += `<td>
+                    <button type="button" class="btn btn-sm btn-outline-success me-1" onclick="exportHistoryItem(${item.id}, 'excel')" title="导出Excel">
+                        <i class="bi bi-file-earmark-excel"></i>
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-info me-1" onclick="exportHistoryItem(${item.id}, 'json')" title="导出JSON">
+                        <i class="bi bi-filetype-json"></i>
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteHistoryItem(${item.id})" title="删除">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </td>`;
+                html += '</tr>';
+            });
+
+            html += '</tbody></table></div>';
+            container.innerHTML = html;
+
+            // 生成分页
+            const totalPages = Math.ceil(total / limit);
+            
+            // 显示统计信息（带页码输入框）
+            const infoContainer = document.getElementById('history-info');
+            if (totalPages > 1) {
+                infoContainer.innerHTML = `共 ${total} 条，第 
+                    <input type="number" class="form-control form-control-sm d-inline-block" 
+                           min="1" max="${totalPages}" value="${page}" 
+                           style="width: 60px; text-align: center;" 
+                           onkeypress="if(event.key === 'Enter') { const p = parseInt(this.value); if(p >= 1 && p <= ${totalPages} && p !== ${page}) loadHistory(p, ${limit}); else this.value = ${page}; }"
+                           onblur="const p = parseInt(this.value); if(p >= 1 && p <= ${totalPages} && p !== ${page}) loadHistory(p, ${limit}); else this.value = ${page};">
+                    /${totalPages} 页`;
+            } else {
+                infoContainer.textContent = `共 ${total} 条`;
+            }
+            
+            displayPaginationHistory('history-pagination', page, totalPages, limit);
+        }
+
+        // 查看历史记录详情
+        async function viewHistoryDetail(id) {
+            try {
+                const result = await httpRequest('GET', `/history/${id}`);
+
+                if (result.code === 200 && result.data) {
+                    const detail = result.data;
+                    // 设置查询类型和关键词
+                    document.getElementById('query-type').value = detail.search_type;
+                    document.getElementById('query-keyword').value = detail.search_keyword;
+                    // 显示结果
+                    displayQueryResult(detail.result_data, detail.search_type, 1, 10);
+                    showPage('query');
+                    showToast('已加载历史记录详情', 'success');
+                } else {
+                    showToast('加载详情失败', 'error');
+                }
+            } catch (error) {
+                showToast('加载详情出错：' + error.message, 'error');
+            }
+        }
+
+        // 导出单个历史记录
+        async function exportHistoryItem(id, format = 'excel') {
+            try {
+                const result = await httpRequest('GET', `/history/${id}`);
+
+                if (result.code === 200 && result.data && result.data.result_data) {
+                    const detail = result.data;
+                    const resultData = detail.result_data;
+
+                    // result_data 直接就是params对象
+                    if (!resultData || !resultData.list || resultData.list.length === 0) {
+                        showToast('该历史记录没有可导出的数据', 'warning');
+                        return;
+                    }
+
+                    const type = detail.search_type;
+                    const listArray = resultData.list;
+
+                    // 如果是JSON格式，直接导出
+                    if (format === 'json') {
+                        const jsonData = {
+                            search_type: detail.search_type,
+                            search_keyword: detail.search_keyword,
+                            result_count: detail.result_count,
+                            search_time: detail.search_time,
+                            data: listArray
+                        };
+                        const blob = new Blob([JSON.stringify(jsonData, null, 2)], { type: 'application/json' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        const typeNames = {
+                            'web': '域名', 'app': 'App', 'mapp': '小程序', 'kapp': '快应用',
+                            'bweb': '违规域名', 'bapp': '违规App', 'bmapp': '违规小程序', 'bkapp': '违规快应用'
+                        };
+                        a.download = `${typeNames[type] || type}_${detail.search_keyword}_${new Date().getTime()}.json`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                        showToast('导出成功', 'success');
+                        return;
+                    }
+
+                    // 字段中文映射
+                    const fieldMapping = {
+                        'contentTypeName': '内容类型',
+                        'domain': '域名',
+                        'domainId': '域名ID',
+                        'leaderName': '负责人',
+                        'limitAccess': '限制访问',
+                        'mainId': '主体ID',
+                        'mainLicence': '主体许可证号',
+                        'natureName': '单位性质',
+                        'serviceId': '服务ID',
+                        'serviceLicence': '服务许可证号',
+                        'unitName': '主办单位',
+                        'updateRecordTime': '更新时间',
+                        'cityId': '城市ID',
+                        'countyId': '区县ID',
+                        'dataId': '数据ID',
+                        'mainUnitAddress': '主体地址',
+                        'mainUnitCertNo': '主体证件号',
+                        'mainUnitCertType': '主体证件类型',
+                        'natureId': '性质ID',
+                        'provinceId': '省份ID',
+                        'serviceName': '服务名称',
+                        'serviceType': '服务类型',
+                        'version': '版本',
+                        'blacklistLevel': '违规级别'
+                    };
+
+                    // 获取第一条数据的所有字段作为表头
+                    const firstItem = listArray[0];
+                    const headers = Object.keys(firstItem);
+
+                    // 生成表头（使用中文映射）
+                    const headerRow = headers.map(key => fieldMapping[key] || key);
+                    const data = [headerRow];
+
+                    // 生成数据行
+                    listArray.forEach(item => {
+                        const row = headers.map(key => item[key] || '');
+                        data.push(row);
+                    });
+
+                    // 使用SheetJS导出
+                    const wb = XLSX.utils.book_new();
+                    const ws = XLSX.utils.aoa_to_sheet(data);
+
+                    // 自动调整列宽
+                    const colWidths = headers.map((key, index) => {
+                        const maxLength = Math.max(
+                            headerRow[index].length,
+                            ...data.slice(1).map(row => String(row[index] || '').length)
+                        );
+                        return { wch: Math.min(maxLength + 2, 50) };
+                    });
+                    ws['!cols'] = colWidths;
+
+                    const typeNames = {
+                        'web': '域名',
+                        'app': 'App',
+                        'mapp': '小程序',
+                        'kapp': '快应用',
+                        'bweb': '违规域名',
+                        'bapp': '违规App',
+                        'bmapp': '违规小程序',
+                        'bkapp': '违规快应用'
+                    };
+
+                    XLSX.utils.book_append_sheet(wb, ws, '查询结果');
+                    XLSX.writeFile(wb, `${typeNames[type] || type}_${detail.search_keyword}_${new Date().getTime()}.xlsx`);
+
+                    showToast('导出成功', 'success');
+                } else {
+                    showToast('该历史记录没有可导出的数据', 'warning');
+                }
+            } catch (error) {
+                showToast('导出出错：' + error.message, 'error');
+            }
+        }
+
+        // 删除历史记录项
+        async function deleteHistoryItem(id) {
+            if (!confirm('确定要删除这条历史记录吗？')) {
+                return;
+            }
+
+            try {
+                const result = await httpRequest('GET', `/history/delete/${id}`);
+
+                if (result.code === 200) {
+                    showToast('删除成功', 'success');
+                    loadHistory();
+                } else {
+                    showToast(result.message || '删除失败', 'error');
+                }
+            } catch (error) {
+                showToast('删除出错：' + error.message, 'error');
+            }
+        }
+
+        // 清空历史记录
+        async function clearHistory() {
+            const type = document.getElementById('history-filter').value;
+            const msg = type ? `确定要清空所有"${type}"类型的历史记录吗？` : '确定要清空所有历史记录吗？';
+
+            if (!confirm(msg)) {
+                return;
+            }
+
+            try {
+                const result = await httpRequest('POST', '/history/clear', { type: type || null });
+
+                if (result.code === 200) {
+                    showToast('清空成功', 'success');
+                    loadHistory();
+                } else {
+                    showToast(result.message || '清空失败', 'error');
+                }
+            } catch (error) {
+                showToast('清空出错：' + error.message, 'error');
+            }
+        }
+
+        // ============ 批量任务历史相关 ============
+
+        // 加载批量任务历史
+        async function loadBatchHistory(page = 1, limit = 20) {
+            const status = document.getElementById('batch-history-filter').value;
+            const searchKeyword = document.getElementById('batch-history-search').value.trim();
+            const offset = (page - 1) * limit;
+
+            try {
+                let url = `/batch/tasks?limit=${limit}&offset=${offset}`;
+                if (status) {
+                    url += `&status=${status}`;
+                }
+
+                const result = await httpRequest('GET', url);
+
+                if (result.code === 200) {
+                    let filteredData = result.data;
+                    let filteredTotal = result.total;
+
+                    // 客户端搜索过滤
+                    if (searchKeyword) {
+                        filteredData = result.data.filter(item =>
+                            item.task_name.toLowerCase().includes(searchKeyword.toLowerCase())
+                        );
+                        filteredTotal = filteredData.length;
+                    }
+
+                    displayBatchHistory(filteredData, filteredTotal, page, limit);
+                } else {
+                    showToast('加载批量任务失败', 'error');
+                }
+            } catch (error) {
+                showToast('加载批量任务出错：' + error.message, 'error');
+            }
+        }
+
+        // 搜索批量任务历史
+        function searchBatchHistory() {
+            const pageSize = parseInt(document.getElementById('batch-history-pagesize').value) || 20;
+            loadBatchHistory(1, pageSize);
+        }
+
+        // 刷新批量任务历史
+        function refreshBatchHistory() {
+            const pageSize = parseInt(document.getElementById('batch-history-pagesize').value) || 20;
+            loadBatchHistory(1, pageSize);
+        }
+
+        // 显示批量任务历史
+        function displayBatchHistory(taskList, total, page, limit) {
+            const container = document.getElementById('batch-history-table-container');
+
+            if (!taskList || taskList.length === 0) {
+                container.innerHTML = '<div class="empty-state"><i class="bi bi-inbox"></i><p>暂无批量任务记录</p></div>';
+                return;
+            }
+
+            const typeNames = {
+                'web': '域名',
+                'app': 'App',
+                'mapp': '小程序',
+                'kapp': '快应用',
+                'bweb': '违规域名',
+                'bapp': '违规App',
+                'bmapp': '违规小程序',
+                'bkapp': '违规快应用'
+            };
+
+            const statusBadge = {
+                'running': '<span class="badge bg-primary">进行中</span>',
+                'completed': '<span class="badge bg-success">已完成</span>',
+                'failed': '<span class="badge bg-danger">失败</span>'
+            };
+
+            let html = '<div class="table-responsive"><table class="table table-hover"><thead><tr>';
+            html += '<th>任务名称</th><th>类型</th><th>总数</th><th>完成</th><th>成功</th><th>状态</th><th>创建时间</th><th>操作</th>';
+            html += '</tr></thead><tbody>';
+
+            taskList.forEach(item => {
+                const progress = item.total_count > 0 ? Math.round((item.completed_count / item.total_count) * 100) : 0;
+                html += '<tr>';
+                html += `<td>${item.task_name}</td>`;
+                html += `<td><span class="badge bg-info">${typeNames[item.task_type] || item.task_type}</span></td>`;
+                html += `<td>${item.total_count}</td>`;
+                html += `<td>${item.completed_count} (${progress}%)</td>`;
+                html += `<td>${item.success_count}</td>`;
+                html += `<td>${statusBadge[item.status] || item.status}</td>`;
+                html += `<td>${item.create_time}</td>`;
+                html += `<td>`;
+
+                if (item.status === 'completed' && item.result_file) {
+                    html += `<button type="button" class="btn btn-sm btn-outline-success me-1" onclick="exportBatchTask('${item.task_name}', 'excel')" title="导出Excel">
+                        <i class="bi bi-file-earmark-excel"></i>
+                    </button>`;
+                    html += `<button type="button" class="btn btn-sm btn-outline-info me-1" onclick="exportBatchTask('${item.task_name}', 'json')" title="导出JSON">
+                        <i class="bi bi-filetype-json"></i>
+                    </button>`;
+                }
+
+                if (item.status === 'running') {
+                    html += `<button type="button" class="btn btn-sm btn-outline-info me-1" onclick="switchToBatchTask('${item.task_name}')" title="切换">
+                        <i class="bi bi-arrow-right-circle"></i>
+                    </button>`;
+                }
+
+                html += `<button type="button" class="btn btn-sm btn-outline-danger" onclick="deleteBatchTask('${item.task_name}')" title="删除">
+                    <i class="bi bi-trash"></i>
+                </button>`;
+                html += '</td>';
+                html += '</tr>';
+            });
+
+            html += '</tbody></table></div>';
+            container.innerHTML = html;
+
+            // 生成分页
+            const totalPages = Math.ceil(total / limit);
+            
+            // 显示统计信息（带页码输入框）
+            const infoContainer = document.getElementById('batch-history-info');
+            if (totalPages > 1) {
+                infoContainer.innerHTML = `共 ${total} 条，第 
+                    <input type="number" class="form-control form-control-sm d-inline-block" 
+                           min="1" max="${totalPages}" value="${page}" 
+                           style="width: 60px; text-align: center;" 
+                           onkeypress="if(event.key === 'Enter') { const p = parseInt(this.value); if(p >= 1 && p <= ${totalPages} && p !== ${page}) loadBatchHistory(p, ${limit}); else this.value = ${page}; }"
+                           onblur="const p = parseInt(this.value); if(p >= 1 && p <= ${totalPages} && p !== ${page}) loadBatchHistory(p, ${limit}); else this.value = ${page};">
+                    /${totalPages} 页`;
+            } else {
+                infoContainer.textContent = `共 ${total} 条`;
+            }
+            
+            displayPaginationBatchHistory('batch-history-pagination', page, totalPages, limit);
+        }
+
+        // 查看批量任务详情
+        async function viewBatchTaskDetail(taskName) {
+            try {
+                const result = await httpRequest('GET', `/batch/task/${taskName}`);
+
+                if (result.code === 200 && result.data && result.data.result_data) {
+                    const task = result.data;
+                    const resultData = task.result_data;
+
+                    // 切换到批量查询页面并显示结果
+                    showPage('batch');
+
+                    // 设置当前任务数据
+                    currentQueryData = {
+                        tasktype: task.task_type,
+                        data: resultData.result
+                    };
+                    window.taskname = taskName;
+
+                    // 更新进度显示
+                    const progressContainer = document.getElementById('batch-progress-container');
+                    const progressBar = document.getElementById('batch-progress-bar');
+                    const progressText = document.getElementById('batch-progress-text');
+
+                    if (progressContainer && progressBar && progressText) {
+                        progressContainer.style.display = 'block';
+                        progressBar.style.width = '100%';
+                        progressBar.innerText = '100%';
+                        progressText.innerText = `任务: ${taskName} - 已完成 ${task.completed_count}/${task.total_count} (100%)`;
+                    }
+
+                    // 显示结果
+                    displayBatchResults(resultData.result, task.task_type);
+
+                    showToast('已加载任务详情', 'success');
+                } else {
+                    showToast('加载任务详情失败', 'error');
+                }
+            } catch (error) {
+                showToast('加载任务详情出错：' + error.message, 'error');
+            }
+        }
+
+        // 显示批量查询结果
+        function displayBatchResults(dataList, type) {
+            // 将结果数据转换为与displayBatchResult相同的格式
+            if (!dataList || dataList.length === 0) {
+                showToast('暂无结果数据', 'warning');
+                return;
+            }
+
+            // 设置当前查询数据以供导出使用
+            window.currentQueryData = {
+                data: dataList,
+                tasktype: type
+            };
+
+            showToast(`已加载 ${dataList.length} 条结果`, 'success');
+        }
+
+        // 查询批量任务进度
+        async function queryBatchProgress() {
+            if (!window.taskname) {
+                return;
+            }
+
+            try {
+                const result = await httpRequest('GET', `/query/task?taskname=${window.taskname}`);
+
+                if (result.code === 404) {
+                    clearInterval(window.batchQueryInterval);
+                    showToast('任务不存在或已删除', 'error');
+                    return;
+                }
+
+                if (result.code === 200) {
+                    const progress = result.progress;
+                    const progressContainer = document.getElementById('batch-progress-container');
+                    const progressText = document.getElementById('batch-progress-text');
+                    const progressBar = document.getElementById('batch-progress-bar');
+
+                    if (progressContainer && progressText && progressBar) {
+                        progressContainer.style.display = 'block';
+                        progressText.textContent = `任务进度：${result.curpro} / ${result.numpro}`;
+                        progressBar.style.width = progress + '%';
+                        progressBar.textContent = progress + '%';
+
+                        if (progress >= 100) {
+                            clearInterval(window.batchQueryInterval);
+                            showToast('批量查询已完成', 'success');
+                            currentQueryData = result;
+                            progressBar.classList.remove('progress-bar-animated');
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('查询任务进度出错：', error);
+                clearInterval(window.batchQueryInterval);
+            }
+        }
+
+        // 切换到正在进行的批量任务
+        async function switchToBatchTask(taskName) {
+            window.taskname = taskName;
+            showPage('batch');
+            showToast(`已切换到任务: ${taskName}`, 'success');
+
+            // 开始轮询任务进度
+            if (window.batchQueryInterval) {
+                clearInterval(window.batchQueryInterval);
+            }
+            queryBatchProgress();
+            window.batchQueryInterval = setInterval(queryBatchProgress, 2000);
+        }
+
+        // 导出批量任务结果
+        async function exportBatchTask(taskName, format = 'excel') {
+            try {
+                const result = await httpRequest('GET', `/batch/task/${taskName}`);
+
+                if (result.code === 200 && result.data && result.data.result_data) {
+                    const task = result.data;
+                    const resultData = task.result_data;
+                    const listArray = resultData.result;
+
+                    if (!listArray || listArray.length === 0 || !listArray[0] || !listArray[0][0]) {
+                        showToast('该任务没有可导出的数据', 'warning');
+                        return;
+                    }
+
+                    // 如果是JSON格式，直接导出
+                    if (format === 'json') {
+                        const jsonData = {
+                            task_name: task.task_name,
+                            task_type: task.task_type,
+                            total_count: task.total_count,
+                            completed_count: task.completed_count,
+                            success_count: task.success_count,
+                            status: task.status,
+                            create_time: task.create_time,
+                            data: listArray.map(item => item[0]).filter(item => item)
+                        };
+                        const blob = new Blob([JSON.stringify(jsonData, null, 2)], { type: 'application/json' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `${taskName}_${new Date().getTime()}.json`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                        showToast('导出成功', 'success');
+                        return;
+                    }
+
+                    // 获取第一条数据的所有字段作为表头
+                    const firstItem = listArray[0][0];
+                    const headers = Object.keys(firstItem);
+
+                    // 字段中文映射
+                    const fieldMapping = {
+                        'contentTypeName': '内容类型',
+                        'domain': '域名',
+                        'domainId': '域名ID',
+                        'leaderName': '负责人',
+                        'limitAccess': '限制访问',
+                        'mainId': '主体ID',
+                        'mainLicence': '主体许可证号',
+                        'natureName': '单位性质',
+                        'serviceId': '服务ID',
+                        'serviceLicence': '服务许可证号',
+                        'unitName': '主办单位',
+                        'updateRecordTime': '更新时间',
+                        'cityId': '城市ID',
+                        'countyId': '区县ID',
+                        'dataId': '数据ID',
+                        'mainUnitAddress': '主体地址',
+                        'mainUnitCertNo': '主体证件号',
+                        'mainUnitCertType': '主体证件类型',
+                        'natureId': '性质ID',
+                        'provinceId': '省份ID',
+                        'serviceName': '服务名称',
+                        'serviceType': '服务类型',
+                        'version': '版本',
+                        'blacklistLevel': '违规级别'
+                    };
+
+                    // 生成表头
+                    const headerRow = headers.map(key => fieldMapping[key] || key);
+                    const data = [headerRow];
+
+                    // 生成数据行
+                    listArray.forEach(item => {
+                        if (item[0]) {
+                            const row = headers.map(key => item[0][key] || '');
+                            data.push(row);
+                        }
+                    });
+
+                    // 使用SheetJS导出
+                    const wb = XLSX.utils.book_new();
+                    const ws = XLSX.utils.aoa_to_sheet(data);
+
+                    // 自动调整列宽
+                    const colWidths = headers.map((key, index) => {
+                        const maxLength = Math.max(
+                            headerRow[index].length,
+                            ...data.slice(1).map(row => String(row[index] || '').length)
+                        );
+                        return { wch: Math.min(maxLength + 2, 50) };
+                    });
+                    ws['!cols'] = colWidths;
+
+                    XLSX.utils.book_append_sheet(wb, ws, '查询结果');
+                    XLSX.writeFile(wb, `${taskName}_${new Date().getTime()}.xlsx`);
+
+                    showToast('导出成功', 'success');
+                } else {
+                    showToast('该任务没有可导出的数据', 'warning');
+                }
+            } catch (error) {
+                showToast('导出出错：' + error.message, 'error');
+            }
+        }
+
+        // 删除批量任务
+        async function deleteBatchTask(taskName) {
+            if (!confirm(`确定要删除任务"${taskName}"吗？删除后将无法恢复！`)) {
+                return;
+            }
+
+            try {
+                const result = await httpRequest('GET', `/batch/task/delete/${taskName}`);
+
+                if (result.code === 200) {
+                    showToast('删除成功', 'success');
+                    loadBatchHistory();
+                } else {
+                    showToast(result.message || '删除失败', 'error');
+                }
+            } catch (error) {
+                showToast('删除出错：' + error.message, 'error');
+            }
+        }
+
+        // 生成分页组件
+        function displayPagination(containerId, currentPage, totalPages, onPageClick) {
+            const container = document.getElementById(containerId);
+
+            if (totalPages <= 1) {
+                container.innerHTML = '';
+                return;
+            }
+
+            let html = '<nav><ul class="pagination justify-content-center">';
+
+            // 上一页
+            html += `<li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+                <a class="page-link" href="#" onclick="event.preventDefault(); ${currentPage > 1 ? `(${onPageClick})(${currentPage - 1})` : ''}">
+                    <i class="bi bi-chevron-left"></i>
+                </a>
+            </li>`;
+
+            // 页码
+            const maxPages = 5;
+            let startPage = Math.max(1, currentPage - Math.floor(maxPages / 2));
+            let endPage = Math.min(totalPages, startPage + maxPages - 1);
+
+            if (endPage - startPage < maxPages - 1) {
+                startPage = Math.max(1, endPage - maxPages + 1);
+            }
+
+            if (startPage > 1) {
+                html += `<li class="page-item"><a class="page-link" href="#" onclick="event.preventDefault(); (${onPageClick})(1)">1</a></li>`;
+                if (startPage > 2) {
+                    html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+                }
+            }
+
+            for (let i = startPage; i <= endPage; i++) {
+                html += `<li class="page-item ${i === currentPage ? 'active' : ''}">
+                    <a class="page-link" href="#" onclick="event.preventDefault(); (${onPageClick})(${i})">${i}</a>
+                </li>`;
+            }
+
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) {
+                    html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+                }
+                html += `<li class="page-item"><a class="page-link" href="#" onclick="event.preventDefault(); (${onPageClick})(${totalPages})">${totalPages}</a></li>`;
+            }
+
+            // 下一页
+            html += `<li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
+                <a class="page-link" href="#" onclick="event.preventDefault(); ${currentPage < totalPages ? `(${onPageClick})(${currentPage + 1})` : ''}">
+                    <i class="bi bi-chevron-right"></i>
+                </a>
+            </li>`;
+
+            html += '</ul></nav>';
+            container.innerHTML = html;
+        }
+
+        // 生成历史记录分页组件
+        function displayPaginationHistory(containerId, currentPage, totalPages, limit) {
+            const container = document.getElementById(containerId);
+
+            if (totalPages <= 1) {
+                container.innerHTML = '';
+                return;
+            }
+
+            let html = '<nav><ul class="pagination justify-content-center">';
+
+            // 上一页
+            html += `<li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+                <a class="page-link" href="#" onclick="event.preventDefault(); ${currentPage > 1 ? `loadHistory(${currentPage - 1}, ${limit})` : ''}">
+                    <i class="bi bi-chevron-left"></i>
+                </a>
+            </li>`;
+
+            // 页码
+            const maxPages = 5;
+            let startPage = Math.max(1, currentPage - Math.floor(maxPages / 2));
+            let endPage = Math.min(totalPages, startPage + maxPages - 1);
+
+            if (endPage - startPage < maxPages - 1) {
+                startPage = Math.max(1, endPage - maxPages + 1);
+            }
+
+            if (startPage > 1) {
+                html += `<li class="page-item"><a class="page-link" href="#" onclick="event.preventDefault(); loadHistory(1, ${limit})">1</a></li>`;
+                if (startPage > 2) {
+                    html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+                }
+            }
+
+            for (let i = startPage; i <= endPage; i++) {
+                html += `<li class="page-item ${i === currentPage ? 'active' : ''}">
+                    <a class="page-link" href="#" onclick="event.preventDefault(); loadHistory(${i}, ${limit})">${i}</a>
+                </li>`;
+            }
+
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) {
+                    html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+                }
+                html += `<li class="page-item"><a class="page-link" href="#" onclick="event.preventDefault(); loadHistory(${totalPages}, ${limit})">${totalPages}</a></li>`;
+            }
+
+            // 下一页
+            html += `<li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
+                <a class="page-link" href="#" onclick="event.preventDefault(); ${currentPage < totalPages ? `loadHistory(${currentPage + 1}, ${limit})` : ''}">
+                    <i class="bi bi-chevron-right"></i>
+                </a>
+            </li>`;
+
+            html += '</ul></nav>';
+            container.innerHTML = html;
+        }
+
+        // 生成批量任务历史分页组件
+        function displayPaginationBatchHistory(containerId, currentPage, totalPages, limit) {
+            const container = document.getElementById(containerId);
+
+            if (totalPages <= 1) {
+                container.innerHTML = '';
+                return;
+            }
+
+            let html = '<nav><ul class="pagination justify-content-center">';
+
+            // 上一页
+            html += `<li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+                <a class="page-link" href="#" onclick="event.preventDefault(); ${currentPage > 1 ? `loadBatchHistory(${currentPage - 1}, ${limit})` : ''}">
+                    <i class="bi bi-chevron-left"></i>
+                </a>
+            </li>`;
+
+            // 页码
+            const maxPages = 5;
+            let startPage = Math.max(1, currentPage - Math.floor(maxPages / 2));
+            let endPage = Math.min(totalPages, startPage + maxPages - 1);
+
+            if (endPage - startPage < maxPages - 1) {
+                startPage = Math.max(1, endPage - maxPages + 1);
+            }
+
+            if (startPage > 1) {
+                html += `<li class="page-item"><a class="page-link" href="#" onclick="event.preventDefault(); loadBatchHistory(1, ${limit})">1</a></li>`;
+                if (startPage > 2) {
+                    html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+                }
+            }
+
+            for (let i = startPage; i <= endPage; i++) {
+                html += `<li class="page-item ${i === currentPage ? 'active' : ''}">
+                    <a class="page-link" href="#" onclick="event.preventDefault(); loadBatchHistory(${i}, ${limit})">${i}</a>
+                </li>`;
+            }
+
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) {
+                    html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+                }
+                html += `<li class="page-item"><a class="page-link" href="#" onclick="event.preventDefault(); loadBatchHistory(${totalPages}, ${limit})">${totalPages}</a></li>`;
+            }
+
+            // 下一页
+            html += `<li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
+                <a class="page-link" href="#" onclick="event.preventDefault(); ${currentPage < totalPages ? `loadBatchHistory(${currentPage + 1}, ${limit})` : ''}">
+                    <i class="bi bi-chevron-right"></i>
+                </a>
+            </li>`;
+
+            html += '</ul></nav>';
+            container.innerHTML = html;
+        }
+
+        // ========== 日志管理相关函数 ==========
+
+        // 加载实时日志
+        async function loadRealtimeLogs() {
+            try {
+                const result = await httpRequest('GET', '/logs/realtime?limit=500');
+
+                if (result.code === 200) {
+                    displayRealtimeLogs(result.data);
+                } else {
+                    showToast('加载日志失败', 'error');
+                }
+            } catch (error) {
+                console.error('加载日志出错：', error);
+            }
+        }
+
+        // 显示实时日志
+        function displayRealtimeLogs(logs) {
+            const container = document.getElementById('log-content');
+
+            if (!logs || logs.length === 0) {
+                container.innerHTML = '<div class="text-muted text-center py-5"><i class="bi bi-inbox" style="font-size: 48px;"></i><p class="mt-3">暂无日志</p></div>';
+                return;
+            }
+
+            let html = '';
+            logs.forEach(log => {
+                // 根据日志级别设置颜色
+                const level = log.level || 'INFO';
+                const levelColor = level === 'ERROR' ? '#ff6b6b' :
+                    level === 'WARNING' ? '#ffd93d' :
+                        level === 'INFO' ? '#6bcf7f' :
+                            level === 'DEBUG' ? '#95c7ff' : '#d4d4d4';
+
+                html += `<div style="margin-bottom: 5px;">`;
+                html += `<span style="color: #888;">[${log.time}]</span> `;
+                html += `<span style="color: ${levelColor};">${log.message}</span>`;
+                html += `</div>`;
+            });
+
+            container.innerHTML = html;
+
+            // 自动滚动到底部
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // 清空实时日志
+        async function clearRealtimeLogs() {
+            if (!confirm('确定要清空所有实时日志吗？')) {
+                return;
+            }
+
+            try {
+                const result = await httpRequest('GET', '/logs/clear');
+
+                if (result.code === 200) {
+                    showToast('日志已清空', 'success');
+                    loadRealtimeLogs();
+                } else {
+                    showToast(result.message || '清空日志失败', 'error');
+                }
+            } catch (error) {
+                showToast('清空日志出错：' + error.message, 'error');
+            }
+        }
+
+        // 启动/停止日志自动刷新
+        function toggleLogRefresh() {
+            const autoRefresh = document.getElementById('auto-refresh-logs').checked;
+
+            if (logRefreshInterval) {
+                clearInterval(logRefreshInterval);
+                logRefreshInterval = null;
+            }
+
+            if (autoRefresh) {
+                logRefreshInterval = setInterval(loadRealtimeLogs, 3000);
+            }
+        }
+
+        // 当切换到日志页面时启动自动刷新
+        function initLogPage() {
+            loadRealtimeLogs();
+            const autoRefresh = document.getElementById('auto-refresh-logs');
+            autoRefresh.addEventListener('change', toggleLogRefresh);
+            if (autoRefresh.checked) {
+                toggleLogRefresh();
+            }
+        }
+
+        // ========== 配置管理相关函数 ==========
+
+        // 加载配置
+        async function loadConfig() {
+            try {
+                const result = await httpRequest('GET', '/config');
+
+                if (result.code === 200) {
+                    const cfg = result.data;
+
+                    // 系统配置
+                    document.getElementById('cfg-host').value = cfg.system.host;
+                    document.getElementById('cfg-port').value = cfg.system.port;
+                    document.getElementById('cfg-http-timeout').value = cfg.system.http_client_timeout;
+                    document.getElementById('cfg-detail-concurrency').value = cfg.system.detail_concurrency;
+                    document.getElementById('cfg-web-ui').checked = cfg.system.web_ui;
+
+                    // 验证码配置
+                    document.getElementById('cfg-captcha-enable').checked = cfg.captcha.enable;
+                    document.getElementById('cfg-retry-times').value = cfg.captcha.retry_times;
+                    document.getElementById('cfg-coding-code').value = cfg.captcha.coding_code;
+
+                    // 代理配置
+                    document.getElementById('cfg-tunnel-url').value = cfg.proxy.tunnel.url || '';
+                    document.getElementById('cfg-extra-api-url').value = cfg.proxy.extra_api.url || '';
+                    document.getElementById('cfg-extra-interval').value = cfg.proxy.extra_api.extra_interval;
+                    document.getElementById('cfg-pool-num').value = cfg.proxy.extra_api.pool_num;
+                    document.getElementById('cfg-auto-maintenace').checked = cfg.proxy.extra_api.auto_maintenace;
+                    document.getElementById('cfg-check-proxy').checked = cfg.proxy.extra_api.check_proxy;
+
+                    // 日志配置
+                    document.getElementById('cfg-save-log').checked = cfg.log.save_log;
+                    document.getElementById('cfg-output-console').checked = cfg.log.output_console;
+                    document.getElementById('cfg-backup-count').value = cfg.log.backup_count;
+
+                    showToast('配置加载成功', 'success');
+                } else {
+                    showToast('加载配置失败', 'error');
+                }
+            } catch (error) {
+                showToast('加载配置出错：' + error.message, 'error');
+            }
+        }
+
+        // 保存配置
+        async function saveConfig() {
+            if (!confirm('确定要保存配置吗？配置需要重启服务后才能生效。')) {
+                return;
+            }
+
+            try {
+                const configData = {
+                    system: {
+                        host: document.getElementById('cfg-host').value,
+                        port: parseInt(document.getElementById('cfg-port').value),
+                        http_client_timeout: parseInt(document.getElementById('cfg-http-timeout').value),
+                        detail_concurrency: parseInt(document.getElementById('cfg-detail-concurrency').value),
+                        web_ui: document.getElementById('cfg-web-ui').checked
+                    },
+                    captcha: {
+                        enable: document.getElementById('cfg-captcha-enable').checked,
+                        save_failed_img: false,
+                        save_failed_img_path: "faile_captcha",
+                        device: ["CPU"],
+                        retry_times: parseInt(document.getElementById('cfg-retry-times').value),
+                        coding_code: document.getElementById('cfg-coding-code').value,
+                        coding_show: false
+                    },
+                    proxy: {
+                        local_ipv6_pool: {
+                            enable: false,
+                            pool_num: 88,
+                            check_interval: 1,
+                            ipv6_network_card: "eth0"
+                        },
+                        tunnel: {
+                            url: document.getElementById('cfg-tunnel-url').value || null
+                        },
+                        extra_api: {
+                            url: document.getElementById('cfg-extra-api-url').value || null,
+                            extra_interval: parseInt(document.getElementById('cfg-extra-interval').value),
+                            timeout: 100,
+                            timeout_drop: 8,
+                            check_proxy: document.getElementById('cfg-check-proxy').checked,
+                            proxy_timeout: 0.5,
+                            check_proxy_num: 20,
+                            auto_maintenace: document.getElementById('cfg-auto-maintenace').checked,
+                            pool_num: parseInt(document.getElementById('cfg-pool-num').value)
+                        }
+                    },
+                    log: {
+                        dir: "logs",
+                        file_head: "ymicp",
+                        backup_count: parseInt(document.getElementById('cfg-backup-count').value),
+                        save_log: document.getElementById('cfg-save-log').checked,
+                        output_console: document.getElementById('cfg-output-console').checked
+                    }
+                };
+
+                const result = await httpRequest('POST', '/config/save', configData);
+
+                if (result.code === 200) {
+                    showToast('配置保存成功！请重启服务使配置生效', 'success');
+                } else {
+                    showToast(result.message || '保存配置失败', 'error');
+                }
+            } catch (error) {
+                showToast('保存配置出错：' + error.message, 'error');
+            }
+        }
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function () {
+            // 绑定回车键查询
+            document.getElementById('query-keyword').addEventListener('keypress', function (e) {
+                if (e.key === 'Enter') {
+                    performQuery();
+                }
+            });
+
+            // 监听窗口大小变化，自动调整侧边栏状态
+            window.addEventListener('resize', function() {
+                const sidebar = document.getElementById('sidebar');
+                const overlay = document.getElementById('sidebar-overlay');
+                
+                // 如果切换到桌面端（大于768px），确保侧边栏正常显示，遮罩隐藏
+                if (window.innerWidth > 768) {
+                    sidebar.classList.remove('show');
+                    overlay.classList.remove('show');
+                }
+            });
+        });
     </script>
 </body>
 

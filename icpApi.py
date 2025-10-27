@@ -20,11 +20,55 @@ import subprocess
 import uuid
 import locale
 import weakref
+from database import Database
+from collections import deque
+import threading
+import logging
 
 VERSION="0.6.2"
 
 pool_cache = TTLCache(maxsize=config.proxy.extra_api.pool_num, 
                       ttl=config.proxy.extra_api.timeout - config.proxy.extra_api.timeout_drop)
+
+# 实时日志收集器
+class LogCollector:
+    def __init__(self, maxlen=1000):
+        self.logs = deque(maxlen=maxlen)
+        self.lock = threading.Lock()
+    
+    def add_log(self, message, level='INFO'):
+        with self.lock:
+            self.logs.append({
+                'time': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'message': message,
+                'level': level
+            })
+    
+    def get_logs(self, limit=500):
+        with self.lock:
+            logs_list = list(self.logs)
+            return logs_list[-limit:] if len(logs_list) > limit else logs_list
+    
+    def clear(self):
+        with self.lock:
+            self.logs.clear()
+
+# 自定义日志处理器，将日志添加到LogCollector
+class CollectorHandler(logging.Handler):
+    def __init__(self, collector):
+        super().__init__()
+        self.collector = collector
+    
+    def emit(self, record):
+        try:
+            msg = self.format(record)
+            # 过滤掉aiohttp.access的日志，因为太多了
+            if 'aiohttp.access' not in record.name:
+                self.collector.add_log(msg, record.levelname)
+        except Exception:
+            self.handleError(record)
+
+log_collector = LogCollector()
 
 # 全局任务管理器
 class TaskManager:
@@ -336,9 +380,21 @@ def jsondump(func):
     async def wrapper(*args, **kwargs):
         result = await func(*args, **kwargs)
         try:
-            return json.dumps(result, ensure_ascii=False)
-        except:
-            return result
+            # 返回 web.Response 对象而不是纯字符串
+            json_text = json.dumps(result, ensure_ascii=False)
+            return web.Response(
+                text=json_text,
+                content_type='application/json',
+                charset='utf-8'
+            )
+        except Exception as e:
+            logger.error(f"JSON序列化失败: {e}, result: {result}")
+            # 如果序列化失败，尝试返回错误信息
+            return web.Response(
+                text=json.dumps({"code": 500, "message": f"JSON序列化失败: {str(e)}"}, ensure_ascii=False),
+                content_type='application/json',
+                charset='utf-8'
+            )
 
     return wrapper
 
@@ -348,7 +404,6 @@ wj = lambda *args, **kwargs: web.json_response(*args, **kwargs)
 
 
 # 处理OPTIONS和跨域的中间件
-@jsondump
 async def options_middleware(app, handler):
     async def middleware(request):
         # 处理 OPTIONS 请求，直接返回空数据和允许跨域的 header
@@ -358,8 +413,14 @@ async def options_middleware(app, handler):
         # 继续处理其他请求,同时处理异常响应，返回正常json值或自定义页面
         try:
             response = await handler(request)
-            response.headers.update(corscode)
-            if response.status == 200:
+            # 确保response是Response对象再更新headers
+            if hasattr(response, 'headers'):
+                response.headers.update(corscode)
+                return response
+            elif not hasattr(response, 'status'):
+                # 如果返回的不是Response对象，包装成Response
+                return web.Response(text=str(response), headers=corscode)
+            else:
                 return response
         except web.HTTPException as ex:
             if ex.status == 404:
@@ -371,8 +432,9 @@ async def options_middleware(app, handler):
                     headers=corscode,
                 )
             return wj({"code": ex.status, "msg": ex.reason}, headers=corscode)
-
-        return response
+        except Exception as e:
+            logger.error(f"中间件处理请求时出错: {e}")
+            return wj({"code": 500, "msg": str(e)}, headers=corscode)
 
     return middleware
 
@@ -473,11 +535,47 @@ async def create_task(taskname, data, request, searnum, apptype="web"):
     except Exception as e:
         logger.error(f"批量任务 {taskname} 执行失败: {e}")
     finally:
-        # 任务完成后清理
+        # 任务完成后保存结果到文件
         if taskname in request.app["tasks"]:
-            # del request.app["tasks"][taskname]
             task = request.app["tasks"][taskname]
             task.completed = True
+            
+            # 创建results目录
+            import os
+            results_dir = "batch_results"
+            os.makedirs(results_dir, exist_ok=True)
+            
+            # 保存结果到JSON文件
+            from datetime import datetime
+            result_file = os.path.join(results_dir, f"{taskname}_{int(datetime.now().timestamp())}.json")
+            
+            try:
+                import json
+                with open(result_file, 'w', encoding='utf-8') as f:
+                    result_data = {
+                        'task_name': taskname,
+                        'task_type': apptype,
+                        'total_count': len(data),
+                        'completed_count': task.curpro,
+                        'result': task.domains
+                    }
+                    json.dump(result_data, f, ensure_ascii=False, indent=2)
+                
+                # 更新数据库
+                db = request.app.get("db")
+                if db:
+                    success_count = sum(1 for item in task.domains if item and len(item) > 0)
+                    db.update_batch_task(
+                        taskname, 
+                        completed_count=task.curpro,
+                        success_count=success_count,
+                        status='completed',
+                        result_file=result_file,
+                        finish_time=datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    )
+                    logger.info(f"批量任务 {taskname} 已完成，结果已保存到 {result_file}")
+            except Exception as e:
+                logger.error(f"保存任务结果失败: {e}")
 
 # 查询任务进度
 @jsondump
@@ -528,6 +626,11 @@ async def create_task_catch(request):
         if taskname in request.app["tasks"]:
             return wj({"code": 409, "message": "任务已存在"})
         
+        # 保存任务到数据库
+        db = request.app.get("db")
+        if db:
+            db.add_batch_task(taskname, seartype, len(domains))
+        
         # 创建异步任务
         task_coroutine = create_task(taskname, domains, request, searnum, seartype)
         async_task = asyncio.create_task(task_coroutine)
@@ -536,6 +639,7 @@ async def create_task_catch(request):
         task_manager.add_task(taskname, async_task)
         
         logger.info(f"创建批量查询任务：{taskname}")
+        log_collector.add_log(f"创建批量查询任务：{taskname}，类型：{seartype}，数量：{len(domains)}")
         return wj({"code": 200,"message":"创建任务成功"})
 
 # 删除批量查询任务
@@ -558,6 +662,7 @@ async def del_task(request):
             del request.app["tasks"][taskname]
             
             logger.warning(f"删除批量查询任务：{taskname}")
+            log_collector.add_log(f"删除批量查询任务：{taskname}")
             return wj({"code": 200})
         else:
             return wj({"code":404,"message":"任务不存在，可能已经完成或删除"})
@@ -637,11 +742,327 @@ async def geturl(request):
             data = await bappth.get(path)(appname, proxy=proxy)
 
         if data.get("code", 500) == 200:
+            # 保存历史记录
+            db = request.app.get("db")
+            if db:
+                result_count = len(data.get("params", {}).get("list", [])) if path in appth else len(data.get("params", []))
+                db.add_history(path, appname, result_count, data.get("params"))
             return wj(data)
         if data.get("message", "") == "当前访问已被创宇盾拦截":
             logger.warning("当前访问已被创宇盾拦截")
             return wj(data)
     return wj(data)
+
+# 历史记录相关路由
+@jsondump
+@routes.view(r"/history")
+async def get_history(request):
+    """获取历史记录列表"""
+    limit = int(request.query.get("limit", 50))
+    offset = int(request.query.get("offset", 0))
+    search_type = request.query.get("type")
+    
+    db = request.app.get("db")
+    if not db:
+        return wj({"code": 500, "message": "数据库未初始化"})
+    
+    history_list = db.get_history(limit=limit, offset=offset, search_type=search_type)
+    total_count = db.get_history_count(search_type=search_type)
+    
+    return wj({
+        "code": 200,
+        "data": history_list,
+        "total": total_count,
+        "limit": limit,
+        "offset": offset
+    })
+
+@jsondump
+@routes.view(r"/history/{history_id:\d+}")
+async def get_history_detail(request):
+    """获取历史记录详情"""
+    history_id = int(request.match_info['history_id'])
+    
+    db = request.app.get("db")
+    if not db:
+        return wj({"code": 500, "message": "数据库未初始化"})
+    
+    history_detail = db.get_history_detail(history_id)
+    
+    if history_detail:
+        return wj({"code": 200, "data": history_detail})
+    else:
+        return wj({"code": 404, "message": "历史记录不存在"})
+
+@jsondump
+@routes.view(r"/history/delete/{history_id:\d+}")
+async def delete_history(request):
+    """删除历史记录"""
+    history_id = int(request.match_info['history_id'])
+    
+    db = request.app.get("db")
+    if not db:
+        return wj({"code": 500, "message": "数据库未初始化"})
+    
+    success = db.delete_history(history_id)
+    
+    if success:
+        return wj({"code": 200, "message": "删除成功"})
+    else:
+        return wj({"code": 500, "message": "删除失败"})
+
+@jsondump
+@routes.view(r"/history/clear")
+async def clear_history(request):
+    """清空历史记录"""
+    if request.method == "POST":
+        data = await request.json()
+        search_type = data.get("type")
+        
+        db = request.app.get("db")
+        if not db:
+            return wj({"code": 500, "message": "数据库未初始化"})
+        
+        success = db.clear_history(search_type=search_type)
+        
+        if success:
+            return wj({"code": 200, "message": "清空成功"})
+        else:
+            return wj({"code": 500, "message": "清空失败"})
+
+# 批量任务管理相关路由
+@routes.view(r"/batch/tasks")
+async def get_batch_tasks(request):
+    """获取批量任务列表"""
+    try:
+        db = request.app.get("db")
+        if not db:
+            return {"code": 500, "message": "数据库未初始化"}
+        
+        limit = int(request.query.get("limit", 20))
+        offset = int(request.query.get("offset", 0))
+        status = request.query.get("status", "")
+        
+        tasks = db.get_batch_tasks(limit=limit, offset=offset, status=status if status else None)
+        total = db.get_batch_tasks_count(status=status if status else None)
+        
+        return wj({"code": 200, "data": tasks, "total": total})
+    except Exception as e:
+        logger.error(f"获取批量任务列表失败: {e}")
+        return wj({"code": 500, "message": f"获取任务列表失败: {str(e)}"})
+
+@routes.view(r"/batch/task/{task_name}")
+async def get_batch_task_detail(request):
+    """获取批量任务详情"""
+    try:
+        task_name = request.match_info.get("task_name")
+        
+        db = request.app.get("db")
+        if not db:
+            return wj({"code": 500, "message": "数据库未初始化"})
+        
+        task = db.get_batch_task_detail(task_name)
+        
+        if task:
+            # 如果任务已完成且有结果文件，读取结果
+            if task.get('result_file') and os.path.exists(task['result_file']):
+                try:
+                    import json
+                    with open(task['result_file'], 'r', encoding='utf-8') as f:
+                        result_data = json.load(f)
+                        task['result_data'] = result_data
+                except Exception as e:
+                    logger.error(f"读取结果文件失败: {e}")
+            
+            return wj({"code": 200, "data": task})
+        else:
+            return wj({"code": 404, "message": "任务不存在"})
+    except Exception as e:
+        logger.error(f"获取批量任务详情失败: {e}")
+        return wj({"code": 500, "message": f"获取任务详情失败: {str(e)}"})
+
+@routes.view(r"/batch/task/delete/{task_name}")
+async def delete_batch_task_api(request):
+    """删除批量任务"""
+    try:
+        task_name = request.match_info.get("task_name")
+        
+        db = request.app.get("db")
+        if not db:
+            return wj({"code": 500, "message": "数据库未初始化"})
+        
+        success = db.delete_batch_task(task_name)
+        
+        if success:
+            return wj({"code": 200, "message": "删除成功"})
+        else:
+            return wj({"code": 500, "message": "删除失败"})
+    except Exception as e:
+        logger.error(f"删除批量任务失败: {e}")
+        return wj({"code": 500, "message": f"删除任务失败: {str(e)}"})
+
+# 配置管理相关路由
+@jsondump
+@routes.view(r"/config")
+async def get_config(request):
+    """获取配置信息"""
+    try:
+        config_data = {
+            "system": {
+                "host": config.system.host,
+                "port": config.system.port,
+                "http_client_timeout": config.system.http_client_timeout,
+                "web_ui": config.system.web_ui,
+                "detail_concurrency": config.system.detail_concurrency
+            },
+            "captcha": {
+                "enable": config.captcha.enable,
+                "save_failed_img": config.captcha.save_failed_img,
+                "save_failed_img_path": config.captcha.save_failed_img_path,
+                "device": config.captcha.device,
+                "retry_times": config.captcha.retry_times,
+                "coding_code": config.captcha.coding_code,
+                "coding_show": config.captcha.coding_show
+            },
+            "proxy": {
+                "local_ipv6_pool": {
+                    "enable": config.proxy.local_ipv6_pool.enable,
+                    "pool_num": config.proxy.local_ipv6_pool.pool_num,
+                    "check_interval": config.proxy.local_ipv6_pool.check_interval,
+                    "ipv6_network_card": config.proxy.local_ipv6_pool.ipv6_network_card
+                },
+                "tunnel": {
+                    "url": config.proxy.tunnel.url or ""
+                },
+                "extra_api": {
+                    "url": config.proxy.extra_api.url or "",
+                    "extra_interval": config.proxy.extra_api.extra_interval,
+                    "timeout": config.proxy.extra_api.timeout,
+                    "timeout_drop": config.proxy.extra_api.timeout_drop,
+                    "check_proxy": config.proxy.extra_api.check_proxy,
+                    "proxy_timeout": config.proxy.extra_api.proxy_timeout,
+                    "check_proxy_num": config.proxy.extra_api.check_proxy_num,
+                    "auto_maintenace": config.proxy.extra_api.auto_maintenace,
+                    "pool_num": config.proxy.extra_api.pool_num
+                }
+            },
+            "log": {
+                "dir": config.log.dir,
+                "file_head": config.log.file_head,
+                "backup_count": config.log.backup_count,
+                "save_log": config.log.save_log,
+                "output_console": config.log.output_console
+            }
+        }
+        return wj({"code": 200, "data": config_data})
+    except Exception as e:
+        logger.error(f"读取配置失败: {e}")
+        return wj({"code": 500, "message": f"读取配置失败: {str(e)}"})
+
+@jsondump
+@routes.view(r"/config/save")
+async def save_config(request):
+    """保存配置"""
+    if request.method == "POST":
+        try:
+            import yaml
+            data = await request.json()
+            
+            # 构建配置字典
+            config_dict = {
+                "system": {
+                    "host": data.get("system", {}).get("host", "0.0.0.0"),
+                    "port": int(data.get("system", {}).get("port", 16181)),
+                    "http_client_timeout": int(data.get("system", {}).get("http_client_timeout", 5)),
+                    "web_ui": bool(data.get("system", {}).get("web_ui", True)),
+                    "detail_concurrency": int(data.get("system", {}).get("detail_concurrency", 5))
+                },
+                "captcha": {
+                    "enable": bool(data.get("captcha", {}).get("enable", True)),
+                    "save_failed_img": bool(data.get("captcha", {}).get("save_failed_img", False)),
+                    "save_failed_img_path": data.get("captcha", {}).get("save_failed_img_path", "faile_captcha"),
+                    "device": data.get("captcha", {}).get("device", ["CPU"]),
+                    "retry_times": int(data.get("captcha", {}).get("retry_times", 2)),
+                    "coding_code": data.get("captcha", {}).get("coding_code", "auto"),
+                    "coding_show": bool(data.get("captcha", {}).get("coding_show", False))
+                },
+                "proxy": {
+                    "local_ipv6_pool": {
+                        "enable": bool(data.get("proxy", {}).get("local_ipv6_pool", {}).get("enable", False)),
+                        "pool_num": int(data.get("proxy", {}).get("local_ipv6_pool", {}).get("pool_num", 88)),
+                        "check_interval": int(data.get("proxy", {}).get("local_ipv6_pool", {}).get("check_interval", 1)),
+                        "ipv6_network_card": data.get("proxy", {}).get("local_ipv6_pool", {}).get("ipv6_network_card", "eth0")
+                    },
+                    "tunnel": {
+                        "url": data.get("proxy", {}).get("tunnel", {}).get("url") or None
+                    },
+                    "extra_api": {
+                        "url": data.get("proxy", {}).get("extra_api", {}).get("url") or None,
+                        "extra_interval": int(data.get("proxy", {}).get("extra_api", {}).get("extra_interval", 3)),
+                        "timeout": int(data.get("proxy", {}).get("extra_api", {}).get("timeout", 100)),
+                        "timeout_drop": int(data.get("proxy", {}).get("extra_api", {}).get("timeout_drop", 8)),
+                        "check_proxy": bool(data.get("proxy", {}).get("extra_api", {}).get("check_proxy", True)),
+                        "proxy_timeout": float(data.get("proxy", {}).get("extra_api", {}).get("proxy_timeout", 0.5)),
+                        "check_proxy_num": int(data.get("proxy", {}).get("extra_api", {}).get("check_proxy_num", 20)),
+                        "auto_maintenace": bool(data.get("proxy", {}).get("extra_api", {}).get("auto_maintenace", True)),
+                        "pool_num": int(data.get("proxy", {}).get("extra_api", {}).get("pool_num", 100))
+                    }
+                },
+                "risk_avoidance": {
+                    "allow_type": ["web", "app", "mapp", "kapp", "bweb", "bapp", "bmapp", "bkapp"],
+                    "prohibit_suffix": []
+                },
+                "log": {
+                    "dir": data.get("log", {}).get("dir", "logs"),
+                    "file_head": data.get("log", {}).get("file_head", "ymicp"),
+                    "backup_count": int(data.get("log", {}).get("backup_count", 7)),
+                    "save_log": bool(data.get("log", {}).get("save_log", False)),
+                    "output_console": bool(data.get("log", {}).get("output_console", True))
+                }
+            }
+            
+            # 备份原配置文件
+            config_path = get_resource_path("config.yml")
+            backup_path = get_resource_path("config.yml.backup")
+            
+            import shutil
+            if os.path.exists(config_path):
+                shutil.copy(config_path, backup_path)
+            
+            # 保存新配置
+            with open(config_path, 'w', encoding='utf-8') as f:
+                yaml.dump(config_dict, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+            
+            logger.info("配置文件已更新，需要重启服务生效")
+            log_collector.add_log("配置文件已更新，需要重启服务生效")
+            return wj({"code": 200, "message": "配置保存成功，重启服务后生效"})
+        except Exception as e:
+            logger.error(f"保存配置文件失败: {e}")
+            return wj({"code": 500, "message": f"保存配置失败: {str(e)}"})
+
+# 日志管理相关路由
+@jsondump
+@routes.view(r"/logs/realtime")
+async def get_realtime_logs(request):
+    """获取实时日志"""
+    limit = int(request.query.get('limit', 500))
+    
+    try:
+        logs = log_collector.get_logs(limit)
+        return wj({"code": 200, "data": logs, "total": len(logs)})
+    except Exception as e:
+        logger.error(f"获取实时日志失败: {e}")
+        return wj({"code": 500, "message": f"获取实时日志失败: {str(e)}"})
+
+@jsondump
+@routes.view(r"/logs/clear")
+async def clear_logs(request):
+    """清空实时日志"""
+    try:
+        log_collector.clear()
+        return wj({"code": 200, "message": "日志已清空"})
+    except Exception as e:
+        return wj({"code": 500, "message": f"清空日志失败: {str(e)}"})
 
 if config.system.web_ui:
     @routes.view(r"/")
@@ -698,6 +1119,9 @@ if __name__ == "__main__":
     aiohttp_jinja2.setup(app, loader=jinja2.FileSystemLoader(get_resource_path("templates")))
     app.add_routes(routes)
     app["tasks"] = {}
+    
+    # 初始化数据库
+    app["db"] = Database()
 
     print('''
 ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
@@ -717,7 +1141,18 @@ if __name__ == "__main__":
     
     app.middlewares.append(options_middleware)
     if config.system.web_ui:
-        print(f"\nweb ui: http://{config.system.host}:{config.system.port}\n\n"
+        print(f"\nweb ui: http://{'127.0.0.1' if config.system.host == '0.0.0.0' else config.system.host}:{config.system.port}\n\n"
               "按两次 Ctrl + C 可以退出程序\n")
-
+    
+    # 将LogCollector处理器添加到root logger
+    collector_handler = CollectorHandler(log_collector)
+    collector_handler.setLevel(logging.INFO)
+    formatter = logging.Formatter('[%(asctime)s] %(levelname)s - %(message)s', '%Y-%m-%d %H:%M:%S')
+    collector_handler.setFormatter(formatter)
+    logging.getLogger().addHandler(collector_handler)
+    
+    # 启动时添加日志
+    logger.info(f"服务启动 - 监听地址: {config.system.host}:{config.system.port}")
+    logger.info(f"验证码识别: {'启用' if config.captcha.enable else '禁用'}")
+    
     web.run_app(app, host=config.system.host, port=config.system.port)

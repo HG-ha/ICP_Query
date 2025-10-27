@@ -17,6 +17,10 @@ logs/
 # vscode settings
 .vscode/
 
+# data files
+batch_results/
+*.db
+
 # other
 打包/
 nuitka-crash-report.xml
