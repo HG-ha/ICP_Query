@@ -148,7 +148,7 @@ asyncio.run(main("微信"))
 - [🔍 镜芯API](https://api2.wer.plus/)
 - [☁️ 林枫云_站长首选云服务器](https://www.dkdun.cn/)
 - [🌐 在线查询ICP备案](https://icp.show)
-
+- [🌐 Ant Ping 一站式网络检测工具](https://antping.com/)
 ## ⭐ Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=HG-ha/ICP_Query&type=Date)](https://star-history.com/#HG-ha/ICP_Query&Date)
