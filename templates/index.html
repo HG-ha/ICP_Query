@@ -1124,7 +1124,7 @@
                 </div>
                 <div class="card-body">
                     <h4>ICP备案批量查询系统</h4>
-                    <p class="text-muted">版本：0.6.31</p>
+                    <p class="text-muted">版本：0.6.32</p>
                     <hr>
                     <h5>功能特性</h5>
                     <ul>
@@ -1582,17 +1582,20 @@
             const type = currentQueryData.tasktype;
             const listArray = currentQueryData.data;
 
-            if (listArray.length === 0 || !listArray[0] || !listArray[0][0]) {
+            if (listArray.length === 0) {
                 showToast('没有可导出的数据', 'warning');
                 return;
             }
 
-            // JSON格式导出
+            // JSON格式导出 - 直接导出原始数据结构
             if (format === 'json') {
                 const jsonData = {
+                    task_name: currentTask,
                     task_type: type,
                     total_count: listArray.length,
-                    data: listArray.map(item => item[0]).filter(item => item)
+                    completed_count: currentQueryData.curpro || listArray.length,
+                    query_keywords: currentQueryData.query_keywords || [],  // 包含查询关键词
+                    result: listArray
                 };
                 const blob = new Blob([JSON.stringify(jsonData, null, 2)], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
@@ -1605,9 +1608,8 @@
                 return;
             }
 
-            // 获取第一条数据的所有字段作为表头
-            const firstItem = listArray[0][0];
-            const headers = Object.keys(firstItem);
+            // Excel格式导出 - 每个查询对象一个sheet
+            const wb = XLSX.utils.book_new();
 
             // 字段中文映射
             const fieldMapping = {
@@ -1640,35 +1642,56 @@
                 'blacklistLevel': '违规级别'
             };
 
-            // 生成表头（使用中文映射，如果没有映射则使用原字段名）
-            const headerRow = headers.map(key => fieldMapping[key] || key);
-            const data = [headerRow];
+            // 遍历每个查询对象，创建独立的sheet
+            const queryKeywords = currentQueryData.query_keywords || [];
+            listArray.forEach((itemList, index) => {
+                if (!itemList || itemList.length === 0) return;
 
-            // 生成数据行
-            listArray.forEach(item => {
-                if (item[0]) {
-                    const row = headers.map(key => item[0][key] || '');
-                    data.push(row);
+                const firstItem = itemList[0];
+                const headers = Object.keys(firstItem);
+                const headerRow = headers.map(key => fieldMapping[key] || key);
+                const sheetData = [headerRow];
+
+                // 添加该查询对象的所有结果
+                itemList.forEach(item => {
+                    sheetData.push(headers.map(key => item[key] ?? ""));
+                });
+
+                const ws = XLSX.utils.aoa_to_sheet(sheetData);
+
+                // 自动调整列宽
+                const colWidths = headers.map((key, idx) => {
+                    const maxLength = Math.max(
+                        headerRow[idx].length,
+                        ...sheetData.slice(1).map(row => String(row[idx] || '').length)
+                    );
+                    return { wch: Math.min(maxLength + 2, 50) };
+                });
+                ws['!cols'] = colWidths;
+
+                // 优先使用查询关键词作为sheet名称
+                let sheetName = '';
+                if (queryKeywords[index]) {
+                    sheetName = queryKeywords[index];
+                } else if (type === 'web' && firstItem.domain) {
+                    sheetName = firstItem.domain;
+                } else if (['app', 'mapp', 'kapp'].includes(type) && firstItem.serviceName) {
+                    sheetName = firstItem.serviceName;
+                } else if (firstItem.unitName) {
+                    sheetName = firstItem.unitName;
+                } else {
+                    sheetName = `查询${index + 1}`;
                 }
+                
+                // Excel sheet名称限制31个字符
+                sheetName = sheetName.substring(0, 31);
+                // 替换非法字符
+                sheetName = sheetName.replace(/[:\\\/\?\*\[\]]/g, '_');
+
+                XLSX.utils.book_append_sheet(wb, ws, sheetName);
             });
 
-            // 使用SheetJS导出
-            const wb = XLSX.utils.book_new();
-            const ws = XLSX.utils.aoa_to_sheet(data);
-
-            // 自动调整列宽
-            const colWidths = headers.map((key, index) => {
-                const maxLength = Math.max(
-                    headerRow[index].length,
-                    ...data.slice(1).map(row => String(row[index] || '').length)
-                );
-                return { wch: Math.min(maxLength + 2, 50) };
-            });
-            ws['!cols'] = colWidths;
-
-            XLSX.utils.book_append_sheet(wb, ws, '查询结果');
             XLSX.writeFile(wb, `${currentTask || 'batch_export'}_${new Date().getTime()}.xlsx`);
-
             showToast('导出成功', 'success');
         }
 
@@ -2300,24 +2323,14 @@
                     const resultData = task.result_data;
                     const listArray = resultData.result;
 
-                    if (!listArray || listArray.length === 0 || !listArray[0] || !listArray[0][0]) {
+                    if (!listArray || listArray.length === 0) {
                         showToast('该任务没有可导出的数据', 'warning');
                         return;
                     }
 
-                    // 如果是JSON格式，直接导出
+                    // JSON格式导出 - 直接导出原始数据结构
                     if (format === 'json') {
-                        const jsonData = {
-                            task_name: task.task_name,
-                            task_type: task.task_type,
-                            total_count: task.total_count,
-                            completed_count: task.completed_count,
-                            success_count: task.success_count,
-                            status: task.status,
-                            create_time: task.create_time,
-                            data: listArray.map(item => item[0]).filter(item => item)
-                        };
-                        const blob = new Blob([JSON.stringify(jsonData, null, 2)], { type: 'application/json' });
+                        const blob = new Blob([JSON.stringify(resultData, null, 2)], { type: 'application/json' });
                         const url = URL.createObjectURL(blob);
                         const a = document.createElement('a');
                         a.href = url;
@@ -2328,9 +2341,8 @@
                         return;
                     }
 
-                    // 获取第一条数据的所有字段作为表头
-                    const firstItem = listArray[0][0];
-                    const headers = Object.keys(firstItem);
+                    // Excel格式导出 - 每个查询对象一个sheet
+                    const wb = XLSX.utils.book_new();
 
                     // 字段中文映射
                     const fieldMapping = {
@@ -2360,35 +2372,57 @@
                         'blacklistLevel': '违规级别'
                     };
 
-                    // 生成表头
-                    const headerRow = headers.map(key => fieldMapping[key] || key);
-                    const data = [headerRow];
+                    // 遍历每个查询对象，创建独立的sheet
+                    const queryKeywords = resultData.query_keywords || [];
+                    listArray.forEach((itemList, index) => {
+                        if (!itemList || itemList.length === 0) return;
 
-                    // 生成数据行
-                    listArray.forEach(item => {
-                        if (item[0]) {
-                            const row = headers.map(key => item[0][key] || '');
-                            data.push(row);
+                        const firstItem = itemList[0];
+                        const headers = Object.keys(firstItem);
+                        const headerRow = headers.map(key => fieldMapping[key] || key);
+                        const sheetData = [headerRow];
+
+                        // 添加该查询对象的所有结果
+                        itemList.forEach(item => {
+                            sheetData.push(headers.map(key => item[key] ?? ""));
+                        });
+
+                        const ws = XLSX.utils.aoa_to_sheet(sheetData);
+
+                        // 自动调整列宽
+                        const colWidths = headers.map((key, idx) => {
+                            const maxLength = Math.max(
+                                headerRow[idx].length,
+                                ...sheetData.slice(1).map(row => String(row[idx] || '').length)
+                            );
+                            return { wch: Math.min(maxLength + 2, 50) };
+                        });
+                        ws['!cols'] = colWidths;
+
+                        // 优先使用查询关键词作为sheet名称
+                        let sheetName = '';
+                        const taskType = resultData.task_type;
+                        if (queryKeywords[index]) {
+                            sheetName = queryKeywords[index];
+                        } else if (taskType === 'web' && firstItem.domain) {
+                            sheetName = firstItem.domain;
+                        } else if (['app', 'mapp', 'kapp'].includes(taskType) && firstItem.serviceName) {
+                            sheetName = firstItem.serviceName;
+                        } else if (firstItem.unitName) {
+                            sheetName = firstItem.unitName;
+                        } else {
+                            sheetName = `查询${index + 1}`;
                         }
+                        
+                        // Excel sheet名称限制31个字符
+                        sheetName = sheetName.substring(0, 31);
+                        // 替换非法字符
+                        sheetName = sheetName.replace(/[:\\\/\?\*\[\]]/g, '_');
+
+                        XLSX.utils.book_append_sheet(wb, ws, sheetName);
                     });
 
-                    // 使用SheetJS导出
-                    const wb = XLSX.utils.book_new();
-                    const ws = XLSX.utils.aoa_to_sheet(data);
-
-                    // 自动调整列宽
-                    const colWidths = headers.map((key, index) => {
-                        const maxLength = Math.max(
-                            headerRow[index].length,
-                            ...data.slice(1).map(row => String(row[index] || '').length)
-                        );
-                        return { wch: Math.min(maxLength + 2, 50) };
-                    });
-                    ws['!cols'] = colWidths;
-
-                    XLSX.utils.book_append_sheet(wb, ws, '查询结果');
                     XLSX.writeFile(wb, `${taskName}_${new Date().getTime()}.xlsx`);
-
                     showToast('导出成功', 'success');
                 } else {
                     showToast('该任务没有可导出的数据', 'warning');

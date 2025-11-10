@@ -31,6 +31,7 @@ async def create_task(taskname, data, request, searnum, apptype="web"):
         'curpro': 0,
         'numpro': len(data),
         'domains': [],
+        'query_keywords': [],  # 记录每个查询的关键词
         'appname': apptype,
         'cancelled': False
     })()
@@ -43,6 +44,8 @@ async def create_task(taskname, data, request, searnum, apptype="web"):
                 return
                 
             error_retry_times = 0
+            all_results = []  # 将 all_results 移到外层，避免重试时被重置
+            
             while error_retry_times < config.captcha.retry_times:
                 if task.cancelled:
                     return
@@ -69,11 +72,60 @@ async def create_task(taskname, data, request, searnum, apptype="web"):
                                     proxy = f"http://{random.choice(res.split()).strip()}"
                             logger.info(f"从代理提取接口获得代理：{proxy}")
 
-                    # 执行查询
-                    data = await appth.get(apptype)(appname, proxy=proxy)
+                    # 执行查询 - 支持分页获取所有数据
+                    page_num = 1
+                    page_size = 26  # 官方单页最大支持26条
+                    
+                    # 对于违法违规类型，不支持分页
+                    if apptype in ["bapp", "bweb", 'bkapp', 'bmapp']:
+                        data = await bappth.get(apptype)(appname, proxy=proxy)
+                    else:
+                        # 循环获取所有页
+                        page_retry_count = 0
+                        max_page_retry = config.captcha.retry_times  # 单页最大重试次数，统一用配置
+                        
+                        while True:
+                            if task.cancelled:
+                                return
+                            
+                            data = await appth.get(apptype)(appname, pageNum=page_num, pageSize=page_size, proxy=proxy)
+                            
+                            # 如果请求失败，重试当前页
+                            if data["code"] != 200:
+                                page_retry_count += 1
+                                if page_retry_count >= max_page_retry:
+                                    logger.warning(f"批量任务 {taskname} - {appname}: 第{page_num}页重试{max_page_retry}次后仍失败，跳过")
+                                    break
+                                logger.info(f"批量任务 {taskname} - {appname}: 第{page_num}页查询失败，重试 {page_retry_count}/{max_page_retry}")
+                                continue
+                            
+                            # 重置重试计数
+                            page_retry_count = 0
+                            
+                            current_list = data.get("params", {}).get("list", [])
+                            if not current_list:
+                                break
+                            
+                            all_results.extend(current_list)
+                            
+                            # 检查是否还有更多数据
+                            total = data.get("params", {}).get("total", 0)
+                            if len(all_results) >= total or len(current_list) < page_size:
+                                logger.info(f"批量任务 {taskname} - {appname}: 共获取 {len(all_results)} 条记录（完成）")
+                                break
+                            
+                            page_num += 1
+                            logger.info(f"批量任务 {taskname} - {appname}: 已获取 {len(all_results)}/{total} 条记录")
+                        
+                        # 更新data中的list为所有结果
+                        if all_results:
+                            if data.get("params"):
+                                data["params"]["list"] = all_results
+                            else:
+                                data = {"code": 200, "params": {"list": all_results, "total": len(all_results)}}
 
                     # 处理响应
-                    if data["code"] == 500:
+                    if data.get("code") == 500:
                         if "请求验证码时失败" in data.get("message", ''):
                             if proxy and proxy[7:] in pool_cache:
                                 del pool_cache[proxy[7:]]
@@ -81,11 +133,24 @@ async def create_task(taskname, data, request, searnum, apptype="web"):
 
                         if data.get("message", "") == "当前访问已被创宇盾拦截":
                             logger.warning(f"当前访问已被创宇盾拦截，批量任务：{taskname}，使用代理：{proxy}")
+                        
+                        # 如果是验证码失败且已经获取了一些数据，不重试整个查询
+                        if all_results:
+                            logger.warning(f"批量任务 {taskname} - {appname}: 验证码失败但已获取 {len(all_results)} 条记录，停止继续查询")
+                            data = {"code": 200, "params": {"list": all_results, "total": len(all_results)}}
+                        else:
+                            # 没有获取到任何数据才继续重试
+                            continue
 
-                    if data["code"] == 200:
+                    if data.get("code") == 200:
                         task.curpro += 1
+                        # 记录查询关键词
+                        task.query_keywords.append(appname)
+                        
                         # 处理返回数据
-                        if len(data["params"]["list"]) == 0:
+                        result_list = data.get("params", {}).get("list", [])
+                        
+                        if len(result_list) == 0:
                             if apptype == "web":
                                 result_data = [{"contentTypeName": None, "domain": appname, "domainId": None, "leaderName": None,
                                          "limitAccess": None, "mainId": None, "mainLicence": None, "natureName": None,
@@ -140,6 +205,7 @@ async def create_task(taskname, data, request, searnum, apptype="web"):
                         'task_type': apptype,
                         'total_count': len(data),
                         'completed_count': task.curpro,
+                        'query_keywords': task.query_keywords,  # 保存查询关键词列表
                         'result': task.domains
                     }
                     json.dump(result_data, f, ensure_ascii=False, indent=2)
@@ -174,6 +240,7 @@ async def querytask(request):
                 "numpro": task.numpro,
                 "tasktype": task.appname,
                 "progress": int(task.curpro / task.numpro * 100),
+                "query_keywords": task.query_keywords,  # 返回查询关键词列表
                 "data":task.domains
             })
     else:
