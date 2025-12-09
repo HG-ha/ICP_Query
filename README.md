@@ -149,6 +149,7 @@ asyncio.run(main("微信"))
 - [☁️ 林枫云_站长首选云服务器](https://www.dkdun.cn/)
 - [🌐 在线查询ICP备案](https://icp.show)
 - [🌐 Ant Ping 一站式网络检测工具](https://antping.com/)
+- [💬 交流群 1029212047](https://qm.qq.com/q/gHf7f0R3zy)
 ## ⭐ Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=HG-ha/ICP_Query&type=Date)](https://star-history.com/#HG-ha/ICP_Query&Date)
