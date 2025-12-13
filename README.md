@@ -57,6 +57,8 @@ cd ICP_Query
 uv init
 uv venv --python 3.11
 uv pip install -r requirements.txt
+# 运行
+uv run icpApi.py
 ```
 
 ## 💻 使用方法
