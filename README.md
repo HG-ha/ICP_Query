@@ -61,6 +61,12 @@ uv pip install -r requirements.txt
 uv run icpApi.py
 ```
 
+## 📱 Android 运行示例
+
+  我们提供了一个在 Android 设备上运行 ICP 查询的示例项目：
+
+- [📲 ICP-for-Android](https://github.com/HG-ha/ICP-for-Android) - 在 Android 设备上使用 Python + ONNX Runtime 进行界面绘制和模型推理
+
 ## 💻 使用方法
 
 ### 使用查询模块
