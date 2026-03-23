@@ -1,14 +1,13 @@
-name: Docker Publish on Version Change
+name: Release
 
 on:
   push:
-    branches:
-      - main
-    paths:
-      - 'icpApi.py' # 仅当包含版本号的文件更改时触发
+    tags:
+      - 'v*'
 
 jobs:
-  build-and-push:
+  build-docker:
+    name: Build Docker Image
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -18,16 +17,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Extract version from icpApi.py
+      - name: Extract version from tag
         id: extract_version
-        run: |
-          VERSION_STRING=$(grep -Po 'VERSION="\K[0-9]+\.[0-9]+\.[0-9]+(?=")' icpApi.py)
-          if [ -z "$VERSION_STRING" ]; then
-            echo "Version not found in icpApi.py"
-            exit 1
-          fi
-          echo "VERSION=v$VERSION_STRING" >> $GITHUB_OUTPUT
-          echo "Extracted version for tagging: v$VERSION_STRING"
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -48,3 +40,101 @@ jobs:
           tags: |
             yiminger/ymicp:${{ steps.extract_version.outputs.VERSION }}
             yiminger/ymicp:latest
+
+  build-executables:
+    name: Build ${{ matrix.os_name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            os_name: Linux
+            artifact_name: ymicp-linux-amd64
+          - os: windows-latest
+            os_name: Windows
+            artifact_name: ymicp-windows-amd64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install system dependencies (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y patchelf ccache
+
+      - name: Install Python dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install nuitka ordered-set zstandard
+
+      - name: Build with Nuitka
+        run: |
+          python -m nuitka --standalone --onefile \
+            --include-data-files="model_data/*=model_data/" \
+            --include-data-files="templates/*=templates/" \
+            --include-data-files="static/js/*=static/js/" \
+            --include-data-files="static/css/*=static/css/" \
+            --include-data-files="static/fonts/*=static/fonts/" \
+            icpApi.py
+        shell: bash
+
+      - name: Package (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          mkdir -p release
+          cp icpApi.bin release/icpApi
+          chmod +x release/icpApi
+          cd release && tar -czf ../${{ matrix.artifact_name }}.tar.gz icpApi
+
+      - name: Package (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          New-Item -ItemType Directory -Force -Path release
+          Copy-Item icpApi.exe -Destination release\
+          Compress-Archive -Path release\icpApi.exe -DestinationPath ${{ matrix.artifact_name }}.zip
+        shell: pwsh
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: |
+            ${{ matrix.artifact_name }}.tar.gz
+            ${{ matrix.artifact_name }}.zip
+
+  release:
+    name: Create GitHub Release
+    needs: [build-docker, build-executables]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Extract version from tag
+        id: extract_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.extract_version.outputs.VERSION }}
+          name: ICP_Query ${{ steps.extract_version.outputs.VERSION }}
+          generate_release_notes: true
+          files: |
+            artifacts/**/*.tar.gz
+            artifacts/**/*.zip
