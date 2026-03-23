@@ -271,7 +271,7 @@ async def create_task_catch(request):
         if len(domains) == 0:
             return wj({"code":400,"message":"在剔除不允许查询的内容后，列表为空，取消任务"})
         
-        searnum = int(data.get("searnum", 20))
+        searnum = int(data.get("querynum", 20))
         
         # 检查是否已存在同名任务
         if taskname in request.app["tasks"]:
