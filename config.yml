@@ -1,18 +1,14 @@
 system:
   host: 0.0.0.0
   port: 16181
-  http_client_timeout: 5
+  http_client_timeout: 30
   web_ui: true
   detail_concurrency: 5
 captcha:
   enable: true
   save_failed_img: false
   save_failed_img_path: faile_captcha
-  device:
-  - CPU
   retry_times: 10
-  coding_code: auto
-  coding_show: false
 proxy:
   local_ipv6_pool:
     enable: false

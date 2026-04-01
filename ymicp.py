@@ -1,19 +1,17 @@
 # -*- coding: utf-8 -*-
 import asyncio
 import aiohttp
-import cv2
 import time
 import hashlib
 import re
 import base64
 import os
+import io
 import numpy as np
+from PIL import Image
 import ujson
 import random
 import uuid
-from Crypto.Cipher import AES
-from Crypto.Util.Padding import pad
-from detnate import detnate
 from aiohttp import TCPConnector
 from mlog import logger
 import warnings
@@ -137,7 +135,6 @@ class beian:
         self.sign = "eyJ0eXBlIjozLCJleHREYXRhIjp7InZhZnljb2RlX2ltYWdlX2tleSI6IjUyZWI1ZTcyODViNzRmNWJhM2YwYzBkNTg0YTg3NmVmIn0sImUiOjE3NTY5NzAyNDg4MjN9.Ngpkwn4T7sQoQF9pCk_sQQpH61wQUEKnK2sQ8hDIq-Q"
         self.token = ""
         self.token_expire = 0
-        self.det = detnate()
         self.timeout = aiohttp.ClientTimeout(total=getattr(getattr(config, 'system', object()), 'http_client_timeout', 30))
         self.local_ipv6_addresses = get_local_ipv6_addresses() if getattr(getattr(getattr(config, 'proxy', object()), 'local_ipv6_pool', object()), 'enable', False) else []
         self.ipv6_index = 0
@@ -288,13 +285,6 @@ class beian:
                 res = await req.text()
                 return re.compile("[0-9a-z]{32}").search(str(req.cookies))[0]
 
-    # 进行aes加密
-    def get_pointJson(self, value, key):
-        cipher = AES.new(key.encode(), AES.MODE_ECB)
-        ciphertext = cipher.encrypt(pad(ujson.dumps(value).encode(), AES.block_size))
-        ciphertext_base64 = base64.b64encode(ciphertext)
-        return ciphertext_base64.decode("utf-8")
-
     def get_clientUid(self):
         characters = "0123456789abcdef"
         unique_id = ["0"] * 36
@@ -310,16 +300,79 @@ class beian:
 
         return ujson.dumps({"clientUid": point_id})
 
+    def match_slider_offset(self, small_image_b64, big_image_b64):
+        """在大图上找与滑块同尺寸的纯色正方形缺口区域，返回其 x 偏移量"""
+        big_img = np.array(Image.open(io.BytesIO(base64.b64decode(big_image_b64))).convert("RGB"))
+        small_img = np.array(Image.open(io.BytesIO(base64.b64decode(small_image_b64))))
+        sh, sw = small_img.shape[:2]
+
+        # 缩小到一半
+        resized = big_img[::2, ::2]
+        h, w = resized.shape[:2]
+        min_side = int(min(sw, sh) * 0.5 * 0.5)
+
+        # 量化颜色，编码为单通道整数
+        q = (resized.astype(np.int32) // 4) * 4
+        color_id = q[:, :, 0] + q[:, :, 1] * 256 + q[:, :, 2] * 65536
+
+        # 找出现次数最多的几个颜色（缺口灰色通常是高频色之一）
+        flat_colors = color_id.ravel()
+        unique, counts = np.unique(flat_colors, return_counts=True)
+        # 只检查出现次数前 5 的颜色
+        top_indices = np.argsort(counts)[-5:]
+
+        best_area = 0
+        best_x = 0
+
+        for idx in top_indices:
+            c = unique[idx]
+            mask = color_id == c
+            # 对每行求该颜色的连续像素数，利用列方向累积
+            # 列投影：每列有多少连续行是该颜色
+            col_run = np.zeros((h, w), dtype=np.int32)
+            col_run[0] = mask[0].astype(np.int32)
+            for y in range(1, h):
+                col_run[y] = np.where(mask[y], col_run[y - 1] + 1, 0)
+
+            # 对每行找符合高度条件的列段的最大宽度
+            for y in range(min_side, h):
+                row = col_run[y] >= min_side
+                if not np.any(row):
+                    continue
+                # 找连续 True 段
+                d = np.diff(row.astype(np.int8))
+                starts = np.where(d == 1)[0] + 1
+                ends = np.where(d == -1)[0] + 1
+                if row[0]:
+                    starts = np.concatenate([[0], starts])
+                if row[-1]:
+                    ends = np.concatenate([ends, [w]])
+                for s, e in zip(starts, ends):
+                    run_w = e - s
+                    if s <= sw // 4:
+                        continue
+                    run_h = int(col_run[y, s])
+                    ratio = run_w / run_h if run_h > 0 else 0
+                    if 0.7 < ratio < 1.4 and run_w * run_h > best_area:
+                        best_area = run_w * run_h
+                        best_x = s
+
+        if best_area == 0:
+            return False, "未找到缺口"
+
+        offset_x = best_x * 2
+        logger.info(f"缺口定位: x={offset_x}, 滑块={sw}x{sh}")
+        return True, offset_x
+
     async def check_img(self, proxy=""):
         success, token, base_header = await self.get_token(proxy)
         if not success:
             logger.info(f"获取token失败：{token}")
-            return False, token,'','',''
+            return False, token, '', '', ''
         try:
             data = self.get_clientUid()
-            clientUid = ujson.loads(data)["clientUid"]
             length = str(len(str(data).encode("utf-8")))
-            base_header.update({"Content-Length": length, "Token": token})
+            base_header.update({"Content-Length": length, "token": token})
             base_header["Content-Type"] = "application/json"
             try:
                 async with self.get_session(proxy) as session:
@@ -327,108 +380,49 @@ class beian:
                         res = await req.json()
             except Exception as e:
                 logger.info(f"请求验证码时失败：{e}")
-                return False, f"请求验证码时失败：{e}",'','',''
-            
+                return False, f"请求验证码时失败：{e}", '', '', ''
+
             p_uuid = res["params"]["uuid"]
             big_image = res["params"]["bigImage"]
             small_image = res["params"]["smallImage"]
-            secretKey = res["params"]["secretKey"]
-            wordCount = res["params"]["wordCount"]
-            start = time.time()
-            success,selice_small = await self.small_selice(small_image, big_image)
-            if not success:
-                logger.info(f"验证码切割失败：{selice_small}")
-                return False, "selice_small",'','',''
-            logger.info(f"预测用时 {time.time() - start} s")
 
-            pointJson = self.get_pointJson(selice_small, secretKey)
-            data = ujson.loads(
-                ujson.dumps(
-                    {
-                        "token": p_uuid,
-                        "secretKey": secretKey,
-                        "clientUid": clientUid,
-                        "pointJson": pointJson,
-                    }
-                )
-            )
-            length = str(len(str(data).encode("utf-8")))
+            start = time.time()
+            match_success, offset_x = self.match_slider_offset(small_image, big_image)
+            if not match_success:
+                logger.info(f"滑块匹配失败：{offset_x}")
+                return False, "滑块匹配失败", '', '', ''
+            logger.info(f"滑块匹配用时 {time.time() - start:.4f}s")
+
+            check_data = ujson.dumps({"key": p_uuid, "value": str(offset_x)})
+            logger.info(f"checkImage 请求体: {check_data}")
+            length = str(len(check_data.encode("utf-8")))
             base_header.update({"Content-Length": length})
             async with self.get_session(proxy) as session:
-                async with session.post(self.checkImage, json=data, headers=base_header, proxy=proxy if proxy else None) as req:
+                async with session.post(self.checkImage, data=check_data, headers=base_header, proxy=proxy if proxy else None) as req:
                     res = await req.text()
+
             data = ujson.loads(res)
-            if data["success"] == False:
+            logger.info(f"checkImage 响应: code={data.get('code')}, msg={data.get('msg')}, success={data.get('success')}")
+            if not data.get("success", False):
                 captcha_config = getattr(config, 'captcha', object())
                 if getattr(captcha_config, 'save_failed_img', False):
                     save_path = getattr(captcha_config, 'save_failed_img_path', './failed_captcha')
-                    folder_paths = [f'{save_path}/ibig', f'{save_path}/isma']
-                    for folder in folder_paths:
+                    for folder in [f'{save_path}/ibig', f'{save_path}/isma']:
                         os.makedirs(folder, exist_ok=True)
-
-                    isma = cv2.imdecode(
-                        np.frombuffer(base64.b64decode(small_image), np.uint8), cv2.COLOR_GRAY2RGB
-                    )
-
-                    ibig = cv2.imdecode(
-                        np.frombuffer(base64.b64decode(big_image), np.uint8), cv2.COLOR_GRAY2RGB
-                    )
-                    
                     filename = f"{uuid.uuid4()}.jpg"
-                    isma_image_name = f"{save_path}/isma/{filename}"
-                    ibig_image_name = f"{save_path}/ibig/{filename}"
-                    logger.info(f"保存到：{isma_image_name}，{ibig_image_name}")
-                    cv2.imwrite(isma_image_name,isma)
-                    cv2.imwrite(ibig_image_name,ibig)
-                return False, "验证码识别失败",'','',''
+                    with open(f"{save_path}/isma/{filename}", "wb") as f:
+                        f.write(base64.b64decode(small_image))
+                    with open(f"{save_path}/ibig/{filename}", "wb") as f:
+                        f.write(base64.b64decode(big_image))
+                    logger.info(f"失败验证码已保存: {filename}")
+                return False, "验证码识别失败", '', '', ''
             else:
-                return True, p_uuid, token, data["params"]["sign"], base_header
-            
+                sign = data["params"]
+                return True, p_uuid, token, sign, base_header
+
         except Exception as e:
             logger.warning(f"check_image Faile : {e}")
-            return False
-
-    async def small_selice(self, small_image, big_image):
-        isma = cv2.imdecode(
-            np.frombuffer(base64.b64decode(small_image), np.uint8), cv2.COLOR_GRAY2RGB
-        )
-
-        isma = cv2.cvtColor(isma, cv2.COLOR_BGRA2BGR) # 测试完注释
-        ibig = cv2.imdecode(
-            np.frombuffer(base64.b64decode(big_image), np.uint8), cv2.COLOR_GRAY2RGB
-        )
-
-        captcha_config = getattr(config, 'captcha', object())
-        if getattr(captcha_config, 'coding_code', 'auto') == 'labour':
-            def mouse_callback(event, x, y, flags, param):
-                if event == cv2.EVENT_LBUTTONDOWN:
-                    data.append({"x":x,"y":y})
-                    if len(data) == 4:
-                        cv2.destroyAllWindows()
-            data = []
-            # 确保两个图像的通道数量一致
-            if ibig.shape[2] != isma.shape[2]:
-                if ibig.shape[2] == 1:
-                    ibig = cv2.cvtColor(ibig, cv2.COLOR_GRAY2BGR)
-                elif ibig.shape[2] == 4 and isma.shape[2] == 3:
-                    isma = cv2.cvtColor(isma, cv2.COLOR_BGR2BGRA)
-                elif ibig.shape[2] == 3 and isma.shape[2] == 4:
-                    ibig = cv2.cvtColor(ibig, cv2.COLOR_BGR2BGRA)
-                elif ibig.shape[2] == 3 and isma.shape[2] == 1:
-                    isma = cv2.cvtColor(isma, cv2.COLOR_GRAY2BGR)
-                elif ibig.shape[2] == 1 and isma.shape[2] == 3:
-                    ibig = cv2.cvtColor(ibig, cv2.COLOR_GRAY2BGR)
-            width = min(ibig.shape[1], isma.shape[1]) 
-            ibig_resized = cv2.resize(ibig, (width, int(ibig.shape[0] * (width / ibig.shape[1])))) 
-            isma_resized = cv2.resize(isma, (width, int(isma.shape[0] * (width / isma.shape[1]))))
-            new_image = np.vstack((ibig_resized, isma_resized))
-            cv2.imshow('Please click in order', new_image)
-            cv2.setMouseCallback('Please click in order', mouse_callback)
-            cv2.waitKey(0)
-            return True, data
-        else:
-            success,data = self.det.check_target(ibig, isma)
-            return success,data
+            return False, str(e), '', '', ''
 
     async def getAppAndMiniDetail(self, dataId, serviceType, p_uuid, token, sign, base_header, proxy="", session=None):
         """优化的详情获取，移除会话复用"""
@@ -436,10 +430,10 @@ class beian:
         length = str(len(str(ujson.dumps(info, ensure_ascii=False)).encode("utf-8")))
 
         detail_header = base_header.copy()
-        detail_header.update({"Content-Length": length, "Uuid": p_uuid, "Token": token, "Sign": sign})
+        detail_header.update({"Content-Length": length, "uuid": p_uuid, "token": token, "sign": sign})
 
         if not getattr(getattr(config, 'captcha', object()), 'enable', False):
-            detail_header.pop("Uuid", None)
+            detail_header.pop("uuid", None)
             detail_header.pop("Content-Length", None)
 
         # 优先使用传入的会话，否则创建新会话
@@ -485,7 +479,7 @@ class beian:
                 return False, p_uuid
 
             length = str(len(str(ujson.dumps(info, ensure_ascii=False)).encode("utf-8")))
-            base_header.update({"Content-Length": length, "Uuid": p_uuid, "Token": token, "Sign": sign})
+            base_header.update({"Content-Length": length, "uuid": p_uuid, "token": token, "sign": sign})
             
             async with self.get_session(proxy) as session:
                 async with session.post(self.queryByCondition,
@@ -500,7 +494,7 @@ class beian:
             if not success:
                 logger.info(f"获取token失败")
                 return False, None
-            base_header.update({"Token": token, "Sign": self.sign})
+            base_header.update({"token": token, "sign": self.sign})
 
             async with self.get_session(proxy) as session:
                 current_ip = None
@@ -604,7 +598,7 @@ class beian:
             
             length = str(len(str(ujson.dumps(info, ensure_ascii=False)).encode("utf-8")))
             base_header.update(
-                {"Content-Length": length, "Uuid": p_uuid, "Token": token, "Sign": sign}
+                {"Content-Length": length, "uuid": p_uuid, "token": token, "sign": sign}
             )
             async with self.get_session(proxy) as session:
                 current_ip = None
@@ -622,7 +616,7 @@ class beian:
             if not success:
                 logger.info(f"获取token失败")
                 return False, None
-            base_header.update({"Token": token, "Sign": self.sign})
+            base_header.update({"token": token, "sign": self.sign})
 
             async with self.get_session(proxy) as session:
                 current_ip = None

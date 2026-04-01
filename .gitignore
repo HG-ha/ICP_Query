@@ -19,6 +19,8 @@ logs/
 
 # data files
 batch_results/
+slider_debug/
+model_data/
 *.db
 
 # other

@@ -35,10 +35,7 @@ async def get_config(request):
                 "enable": config.captcha.enable,
                 "save_failed_img": config.captcha.save_failed_img,
                 "save_failed_img_path": config.captcha.save_failed_img_path,
-                "device": config.captcha.device,
-                "retry_times": config.captcha.retry_times,
-                "coding_code": config.captcha.coding_code,
-                "coding_show": config.captcha.coding_show
+                "retry_times": config.captcha.retry_times
             },
             "proxy": {
                 "local_ipv6_pool": {
@@ -105,10 +102,7 @@ async def save_config(request):
                     "enable": bool(data.get("captcha", {}).get("enable", True)),
                     "save_failed_img": bool(data.get("captcha", {}).get("save_failed_img", False)),
                     "save_failed_img_path": data.get("captcha", {}).get("save_failed_img_path", "faile_captcha"),
-                    "device": data.get("captcha", {}).get("device", ["CPU"]),
-                    "retry_times": int(data.get("captcha", {}).get("retry_times", 2)),
-                    "coding_code": data.get("captcha", {}).get("coding_code", "auto"),
-                    "coding_show": bool(data.get("captcha", {}).get("coding_show", False))
+                    "retry_times": int(data.get("captcha", {}).get("retry_times", 2))
                 },
                 "proxy": {
                     "local_ipv6_pool": {

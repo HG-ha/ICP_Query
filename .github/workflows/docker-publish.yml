@@ -41,18 +41,10 @@ jobs:
             yiminger/ymicp:${{ steps.extract_version.outputs.VERSION }}
             yiminger/ymicp:latest
 
-  build-executables:
-    name: Build ${{ matrix.os_name }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-latest
-            os_name: Linux
-            artifact_name: ymicp-linux-amd64
-          - os: windows-latest
-            os_name: Windows
-            artifact_name: ymicp-windows-amd64
+  build-linux:
+    name: Build Linux
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
 
     steps:
       - name: Checkout repository
@@ -63,8 +55,7 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install system dependencies (Linux)
-        if: matrix.os == 'ubuntu-latest'
+      - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y patchelf ccache
@@ -76,42 +67,74 @@ jobs:
 
       - name: Build with Nuitka
         run: |
-          python -m nuitka --standalone --onefile \
-            --include-data-files="model_data/*=model_data/" \
+          yes | python -m nuitka --standalone --onefile \
             --include-data-files="templates/*=templates/" \
             --include-data-files="static/js/*=static/js/" \
             --include-data-files="static/css/*=static/css/" \
             --include-data-files="static/fonts/*=static/fonts/" \
             icpApi.py
-        shell: bash
 
-      - name: Package (Linux)
-        if: matrix.os == 'ubuntu-latest'
+      - name: Package
         run: |
           mkdir -p release
           cp icpApi.bin release/icpApi
           chmod +x release/icpApi
-          cd release && tar -czf ../${{ matrix.artifact_name }}.tar.gz icpApi
-
-      - name: Package (Windows)
-        if: matrix.os == 'windows-latest'
-        run: |
-          New-Item -ItemType Directory -Force -Path release
-          Copy-Item icpApi.exe -Destination release\
-          Compress-Archive -Path release\icpApi.exe -DestinationPath ${{ matrix.artifact_name }}.zip
-        shell: pwsh
+          cd release && tar -czf ../ymicp-linux-amd64.tar.gz icpApi
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact_name }}
-          path: |
-            ${{ matrix.artifact_name }}.tar.gz
-            ${{ matrix.artifact_name }}.zip
+          name: ymicp-linux-amd64
+          path: ymicp-linux-amd64.tar.gz
+
+  build-windows:
+    name: Build Windows
+    runs-on: windows-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install nuitka ordered-set zstandard
+
+      - name: Download Dependency Walker
+        shell: pwsh
+        run: |
+          $cacheDir = "$env:LOCALAPPDATA\Nuitka\Nuitka\Cache\downloads\depends\x86_64"
+          New-Item -ItemType Directory -Force -Path $cacheDir
+          Invoke-WebRequest -Uri "https://dependencywalker.com/depends22_x64.zip" -OutFile "$cacheDir\depends22_x64.zip"
+          Expand-Archive -Path "$cacheDir\depends22_x64.zip" -DestinationPath $cacheDir -Force
+
+      - name: Build with Nuitka
+        shell: cmd
+        run: |
+          echo Yes | python -m nuitka --standalone --onefile --include-data-files="templates/*=templates/" --include-data-files="static/js/*=static/js/" --include-data-files="static/css/*=static/css/" --include-data-files="static/fonts/*=static/fonts/" icpApi.py
+
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path release
+          Copy-Item icpApi.exe -Destination release\
+          Compress-Archive -Path release\icpApi.exe -DestinationPath ymicp-windows-amd64.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ymicp-windows-amd64
+          path: ymicp-windows-amd64.zip
 
   release:
     name: Create GitHub Release
-    needs: [build-docker, build-executables]
+    needs: [build-docker, build-linux, build-windows]
     runs-on: ubuntu-latest
     permissions:
       contents: write

@@ -30,7 +30,7 @@ from middlewares import options_middleware
 from routes import setup_routes
 
 
-VERSION="0.6.33"
+VERSION="0.7.0"
 
 
 def print_banner():
