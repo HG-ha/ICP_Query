@@ -27,7 +27,7 @@
 - ✅ 内置webui，默认开启，浏览器访问 [http://127.0.0.1:16181](http://127.0.0.1:16181) 即可
 - ✅ AMD 9600X 处理器平均识别仅需0.09s，支持模型加速
 
-## 🎯 验证码识别效果
+## 🎯 验证码识别效果（已适配最新滑块）
 <div align="center">
   <img width="500" height="240" alt="image" src="https://github.com/user-attachments/assets/7acf9a45-c947-4dd0-9185-839e43b4483f" />
   <img width="500" height="240" alt="image" src="https://github.com/user-attachments/assets/e5fc2452-8d32-408d-adcd-f62f5c1bdc7f" />
