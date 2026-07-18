@@ -41,8 +41,9 @@ jobs:
             yiminger/ymicp:${{ steps.extract_version.outputs.VERSION }}
             yiminger/ymicp:latest
 
+  # ---------- Python (Nuitka) ----------
   build-linux:
-    name: Build Linux
+    name: Build Linux (Python)
     runs-on: ubuntu-22.04
     timeout-minutes: 120
 
@@ -62,22 +63,32 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          pip install -r requirements.txt
+          pip install -r src/python/requirements.txt
           pip install nuitka ordered-set zstandard
 
+      - name: Prepare build tree
+        run: |
+          mkdir -p build/python
+          cp -r src/python/* build/python/
+          cp -r templates static config.yml build/python/
+
       - name: Build with Nuitka
+        working-directory: build/python
         run: |
           yes | python -m nuitka --standalone --onefile \
+            --include-module=mcp_server \
+            --include-package=mcp \
             --include-data-files="templates/*=templates/" \
             --include-data-files="static/js/*=static/js/" \
             --include-data-files="static/css/*=static/css/" \
             --include-data-files="static/fonts/*=static/fonts/" \
+            --include-data-files="config.yml=config.yml" \
             icpApi.py
 
       - name: Package
         run: |
           mkdir -p release
-          cp icpApi.bin release/icpApi
+          cp build/python/icpApi.bin release/icpApi
           chmod +x release/icpApi
           cd release && tar -czf ../ymicp-linux-amd64.tar.gz icpApi
 
@@ -88,7 +99,7 @@ jobs:
           path: ymicp-linux-amd64.tar.gz
 
   build-windows:
-    name: Build Windows
+    name: Build Windows (Python)
     runs-on: windows-latest
     timeout-minutes: 120
 
@@ -103,8 +114,17 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          pip install -r requirements.txt
+          pip install -r src/python/requirements.txt
           pip install nuitka ordered-set zstandard
+
+      - name: Prepare build tree
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path build\python
+          Copy-Item -Recurse src\python\* build\python\
+          Copy-Item -Recurse templates build\python\
+          Copy-Item -Recurse static build\python\
+          Copy-Item config.yml build\python\
 
       - name: Download Dependency Walker
         shell: pwsh
@@ -115,15 +135,16 @@ jobs:
           Expand-Archive -Path "$cacheDir\depends22_x64.zip" -DestinationPath $cacheDir -Force
 
       - name: Build with Nuitka
+        working-directory: build/python
         shell: cmd
         run: |
-          echo Yes | python -m nuitka --standalone --onefile --include-data-files="templates/*=templates/" --include-data-files="static/js/*=static/js/" --include-data-files="static/css/*=static/css/" --include-data-files="static/fonts/*=static/fonts/" icpApi.py
+          echo Yes | python -m nuitka --standalone --onefile --include-module=mcp_server --include-package=mcp --include-data-files="templates/*=templates/" --include-data-files="static/js/*=static/js/" --include-data-files="static/css/*=static/css/" --include-data-files="static/fonts/*=static/fonts/" --include-data-files="config.yml=config.yml" icpApi.py
 
       - name: Package
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path release
-          Copy-Item icpApi.exe -Destination release\
+          Copy-Item build\python\icpApi.exe -Destination release\
           Compress-Archive -Path release\icpApi.exe -DestinationPath ymicp-windows-amd64.zip
 
       - name: Upload artifact
@@ -132,9 +153,102 @@ jobs:
           name: ymicp-windows-amd64
           path: ymicp-windows-amd64.zip
 
+  # ---------- Rust ----------
+  build-linux-rs:
+    name: Build Linux (Rust)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src/rust -> target
+
+      - name: Build release
+        working-directory: src/rust
+        run: cargo build --release
+
+      - name: Install UPX
+        run: |
+          VER=5.2.0
+          curl -fsSL "https://github.com/upx/upx/releases/download/v${VER}/upx-${VER}-amd64_linux.tar.xz" -o upx.tar.xz
+          tar -xJf upx.tar.xz
+          sudo install -m 755 "upx-${VER}-amd64_linux/upx" /usr/local/bin/upx
+          upx --version
+
+      - name: Package
+        run: |
+          mkdir -p release
+          cp src/rust/target/release/ymicp release/icpApi-rs
+          chmod +x release/icpApi-rs
+          upx --best --lzma release/icpApi-rs
+          # 附带运行所需资源（相对可执行文件上级或同级均可；此处打进同目录便于单独分发）
+          cp -r templates static config.yml release/
+          cd release && tar -czf ../ymicp-linux-amd64-rs.tar.gz icpApi-rs templates static config.yml
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ymicp-linux-amd64-rs
+          path: ymicp-linux-amd64-rs.tar.gz
+
+  build-windows-rs:
+    name: Build Windows (Rust)
+    runs-on: windows-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src/rust -> target
+
+      - name: Build release
+        working-directory: src/rust
+        run: cargo build --release
+
+      - name: Install UPX
+        shell: pwsh
+        run: |
+          $ver = "5.2.0"
+          Invoke-WebRequest -Uri "https://github.com/upx/upx/releases/download/v$ver/upx-$ver-win64.zip" -OutFile upx.zip
+          Expand-Archive -Path upx.zip -DestinationPath upx-dist -Force
+          Add-Content -Path $env:GITHUB_PATH -Value "$pwd\upx-dist\upx-$ver-win64"
+          & "$pwd\upx-dist\upx-$ver-win64\upx.exe" --version
+
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path release
+          Copy-Item src\rust\target\release\ymicp.exe -Destination release\icpApi-rs.exe
+          upx --best --lzma release\icpApi-rs.exe
+          Copy-Item -Recurse templates release\
+          Copy-Item -Recurse static release\
+          Copy-Item config.yml release\
+          Compress-Archive -Path release\* -DestinationPath ymicp-windows-amd64-rs.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ymicp-windows-amd64-rs
+          path: ymicp-windows-amd64-rs.zip
+
   release:
     name: Create GitHub Release
-    needs: [build-docker, build-linux, build-windows]
+    needs: [build-docker, build-linux, build-windows, build-linux-rs, build-windows-rs]
     runs-on: ubuntu-latest
     permissions:
       contents: write

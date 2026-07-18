@@ -46,3 +46,13 @@ log:
   output_console: true
 history:
   save_query_history: false
+auth:
+  enable: false
+  secret: change-me
+  session_hours: 72
+  users:
+  - username: admin
+    password: admin123
+mcp:
+  enable: false
+  port: 16182

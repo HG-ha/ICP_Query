@@ -49,17 +49,98 @@ docker run -d -p 16181:16181 --name ymicp yiminger/ymicp
 
 - [📥 Release下载可执行文件](https://github.com/HG-ha/ICP_Query/releases)
 
-### 3. 源码部署
+### 3. 源码部署（Python）
 
 ```shell
 git clone https://github.com/HG-ha/ICP_Query.git
 cd ICP_Query
 uv init
 uv venv --python 3.11
-uv pip install -r requirements.txt
-# 运行
-uv run icpApi.py
+uv pip install -r src/python/requirements.txt
+# 在仓库根目录运行（自动读取根目录 config.yml / templates / static）
+uv run python src/python/icpApi.py
 ```
+
+### 4. 源码部署（Rust）
+
+```shell
+cd src/rust
+cargo run --release
+```
+
+Release 产物：Python 为 `ymicp-*-amd64.{tar.gz,zip}`；Rust 为 `ymicp-*-amd64-rs.{tar.gz,zip}`（可执行文件 `icpApi-rs` / `icpApi-rs.exe`）。
+
+## 🔐 账号登录（公网部署）
+
+对应 [Issue #40](https://github.com/HG-ha/ICP_Query/issues/40)。出口 IP 变动时可用账号密码保护 Web UI 与 API。
+
+在 `config.yml` 中：
+
+```yaml
+auth:
+  enable: true          # 公网务必改为 true
+  secret: change-me     # 请修改为随机字符串
+  session_hours: 72
+  users:
+  - username: admin
+    password: admin123  # 首次可用明文；保存配置后自动变为 sha256$...
+```
+
+- 登录：`POST /api/auth/login`，或打开 Web UI 登录页
+- API：Cookie `ymicp_session` 或头 `Authorization: Bearer <token>`
+- 默认 `enable: false`，行为与旧版兼容
+
+## 🧩 MCP 服务
+
+对应 [Issue #42](https://github.com/HG-ha/ICP_Query/issues/42)。Python 与 Rust 均提供相同工具：`icp_query`（type/search/page_num/page_size）、`icp_query_types`。
+
+**stdio（Claude Desktop / Cursor 推荐）：**
+
+```shell
+# Python 编译产物 / 源码入口（二选一）
+./icpApi --mcp
+python src/python/icpApi.py --mcp
+# 也可：python src/python/mcp_server.py
+
+# Rust
+./icpApi-rs --mcp
+# 或：cargo run --release -- --mcp
+```
+
+Claude Desktop 示例（`claude_desktop_config.json`）：
+
+```json
+{
+  "mcpServers": {
+    "icp-query": {
+      "command": "H:/path/to/icpApi",
+      "args": ["--mcp"]
+    },
+    "icp-query-rs": {
+      "command": "H:/path/to/icpApi-rs",
+      "args": ["--mcp"]
+    }
+  }
+}
+```
+
+**Streamable HTTP（可选，两端一致）：**
+
+```yaml
+mcp:
+  enable: true
+  port: 16182
+```
+
+主服务启动时会在独立端口监听 `/mcp`。也可单独启动：
+
+```shell
+./icpApi --mcp-http
+./icpApi-rs --mcp-http
+# 源码：python src/python/icpApi.py --mcp-http
+```
+
+→ `http://127.0.0.1:16182/mcp`
 
 ## 📱 Android 运行示例
 

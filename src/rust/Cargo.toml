@@ -1,0 +1,98 @@
+[package]
+name = "ymicp"
+version = "0.7.0"
+edition = "2021"
+description = "ICP备案查询系统 - Rust 重写版"
+authors = ["ymicp"]
+
+[dependencies]
+tokio = { version = "1", default-features = false, features = [
+    "rt-multi-thread",
+    "macros",
+    "net",
+    "time",
+    "signal",
+    "sync",
+] }
+axum = { version = "0.8", default-features = false, features = [
+    "http1",
+    "json",
+    "query",
+    "tokio",
+] }
+tower = { version = "0.5", default-features = false }
+tower-http = { version = "0.6", default-features = false, features = [
+    "cors",
+    "fs",
+    "set-header",
+] }
+reqwest = { version = "0.12", default-features = false, features = [
+    "json",
+    "rustls-tls",
+] }
+serde = { version = "1", default-features = false, features = ["derive", "std"] }
+serde_json = { version = "1", default-features = false, features = ["std"] }
+serde_yaml = "0.9"
+rusqlite = { version = "0.32", features = ["bundled"] }
+zune-png = "0.4"
+zune-core = "0.4"
+base64 = { version = "0.22", default-features = false, features = ["std"] }
+md5 = "0.7"
+hmac = "0.12"
+sha2 = "0.10"
+hex = "0.4"
+uuid = { version = "1", default-features = false, features = ["v4", "std"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+tracing = { version = "0.1", default-features = false, features = ["std"] }
+tracing-subscriber = { version = "0.3", default-features = false, features = [
+    "fmt",
+    "ansi",
+    "std",
+    "registry",
+] }
+tracing-appender = "0.2"
+parking_lot = "0.12"
+futures = { version = "0.3", default-features = false, features = ["std", "async-await"] }
+rand = { version = "0.8", default-features = false, features = ["std", "std_rng"] }
+anyhow = { version = "1", default-features = false, features = ["std"] }
+url = { version = "2", default-features = false }
+bytes = { version = "1", default-features = false }
+http = { version = "1", default-features = false }
+http-body-util = "0.1"
+hyper = { version = "1", default-features = false, features = ["client", "http1"] }
+hyper-util = { version = "0.1", default-features = false, features = [
+    "client",
+    "client-legacy",
+    "tokio",
+    "http1",
+] }
+hyper-rustls = { version = "0.27", default-features = false, features = [
+    "http1",
+    "tls12",
+    "ring",
+    "webpki-tokio",
+] }
+rustls = { version = "0.23", default-features = false, features = [
+    "ring",
+    "std",
+    "tls12",
+] }
+rmcp = { version = "0.12", default-features = false, features = [
+    "base64",
+    "server",
+    "macros",
+    "transport-io",
+    "transport-streamable-http-server",
+] }
+tokio-util = { version = "0.7", default-features = false, features = ["rt"] }
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+overflow-checks = false
+
+[profile.release.package."*"]
+opt-level = "z"

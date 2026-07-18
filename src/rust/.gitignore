@@ -1,0 +1,6 @@
+/target/
+*.db
+batch_results/
+logs/
+faile_captcha/
+config.yml.backup

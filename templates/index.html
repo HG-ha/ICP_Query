@@ -428,10 +428,74 @@
             font-size: 64px;
             margin-bottom: 20px;
         }
+
+        /* 登录遮罩 */
+        .login-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .login-overlay.show {
+            display: flex;
+        }
+
+        .login-card {
+            background: #fff;
+            border-radius: 16px;
+            padding: 36px 32px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+        }
+
+        .login-card h3 {
+            margin-bottom: 8px;
+            font-weight: 700;
+        }
+
+        .app-shell.auth-locked .sidebar,
+        .app-shell.auth-locked .main-content,
+        .app-shell.auth-locked .menu-toggle {
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        .sidebar-user {
+            padding: 12px 20px;
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 13px;
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            margin-top: 16px;
+        }
     </style>
 </head>
 
-<body>
+<body class="app-shell">
+    <!-- 登录页 -->
+    <div class="login-overlay" id="login-overlay">
+        <div class="login-card">
+            <h3><i class="bi bi-shield-lock"></i> 登录</h3>
+            <p class="text-muted mb-4">ICP备案查询系统</p>
+            <div class="mb-3">
+                <label class="form-label">用户名</label>
+                <input type="text" id="login-username" class="form-control" autocomplete="username" placeholder="admin">
+            </div>
+            <div class="mb-3">
+                <label class="form-label">密码</label>
+                <input type="password" id="login-password" class="form-control" autocomplete="current-password" placeholder="密码">
+            </div>
+            <div id="login-error" class="text-danger mb-3" style="display:none;font-size:14px;"></div>
+            <button class="btn btn-primary w-100" onclick="doLogin()">
+                <i class="bi bi-box-arrow-in-right"></i> 登录
+            </button>
+        </div>
+    </div>
+
     <!-- 汉堡菜单按钮 -->
     <button class="menu-toggle" onclick="toggleSidebar()">
         <i class="bi bi-list"></i>
@@ -489,7 +553,14 @@
                     <span>关于</span>
                 </a>
             </div>
+            <div class="nav-item" id="nav-logout-item" style="display:none;">
+                <a class="nav-link" href="#" onclick="doLogout(); return false;">
+                    <i class="bi bi-box-arrow-right"></i>
+                    <span>退出登录</span>
+                </a>
+            </div>
         </nav>
+        <div class="sidebar-user" id="sidebar-user" style="display:none;"></div>
     </div>
 
     <!-- 主内容区域 -->
@@ -1096,6 +1167,56 @@
                 </div>
             </div>
 
+            <!-- 账号认证 -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <i class="bi bi-person-lock"></i> 账号认证（公网部署建议开启）
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-4">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="cfg-auth-enable">
+                                <label class="form-check-label" for="cfg-auth-enable"><strong>启用登录认证</strong></label>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">会话有效期（小时）</label>
+                            <input type="number" id="cfg-auth-session-hours" class="form-control" value="72">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">签名密钥 secret</label>
+                            <input type="text" id="cfg-auth-secret" class="form-control" placeholder="change-me">
+                        </div>
+                    </div>
+                    <label class="form-label">用户列表（每行：用户名 密码；密码留空表示不修改）</label>
+                    <textarea id="cfg-auth-users" class="form-control" rows="3" placeholder="admin admin123"></textarea>
+                    <small class="text-muted">保存时明文密码会自动哈希为 sha256$</small>
+                </div>
+            </div>
+
+            <!-- MCP -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <i class="bi bi-plugin"></i> MCP 服务
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="cfg-mcp-enable">
+                                <label class="form-check-label" for="cfg-mcp-enable"><strong>随主服务启动 Streamable HTTP</strong></label>
+                            </div>
+                            <small class="text-muted">stdio 无需开启：<code>icpApi --mcp</code> / <code>icpApi-rs --mcp</code></small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">MCP HTTP 端口</label>
+                            <input type="number" id="cfg-mcp-port" class="form-control" value="16182">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="d-flex justify-content-between align-items-center">
                 <div>
                     <button type="button" class="btn btn-warning btn-lg" onclick="restartService()">
@@ -1290,16 +1411,113 @@
             toast.show();
         }
 
+        let authToken = localStorage.getItem('ymicp_token') || '';
+        let authEnabled = false;
+        let currentUsername = null;
+
+        function showLoginOverlay(show) {
+            const overlay = document.getElementById('login-overlay');
+            document.body.classList.toggle('auth-locked', !!show);
+            if (show) overlay.classList.add('show');
+            else overlay.classList.remove('show');
+        }
+
+        function updateAuthUI() {
+            const logoutItem = document.getElementById('nav-logout-item');
+            const userEl = document.getElementById('sidebar-user');
+            if (authEnabled && currentUsername) {
+                logoutItem.style.display = '';
+                userEl.style.display = '';
+                userEl.textContent = '当前用户：' + currentUsername;
+            } else {
+                logoutItem.style.display = 'none';
+                userEl.style.display = 'none';
+            }
+        }
+
+        async function checkAuthStatus() {
+            try {
+                const headers = { 'Content-Type': 'application/json' };
+                if (authToken) headers['Authorization'] = 'Bearer ' + authToken;
+                const resp = await fetch('/api/auth/status', { headers, credentials: 'include' });
+                const result = await resp.json();
+                authEnabled = !!(result.data && result.data.enable);
+                if (!authEnabled) {
+                    currentUsername = null;
+                    showLoginOverlay(false);
+                    updateAuthUI();
+                    return true;
+                }
+                if (result.data.authenticated) {
+                    currentUsername = result.data.username;
+                    showLoginOverlay(false);
+                    updateAuthUI();
+                    return true;
+                }
+                showLoginOverlay(true);
+                updateAuthUI();
+                return false;
+            } catch (e) {
+                return true;
+            }
+        }
+
+        async function doLogin() {
+            const username = document.getElementById('login-username').value.trim();
+            const password = document.getElementById('login-password').value;
+            const errEl = document.getElementById('login-error');
+            errEl.style.display = 'none';
+            try {
+                const resp = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const result = await resp.json();
+                if (result.code === 200 && result.data && result.data.token) {
+                    authToken = result.data.token;
+                    localStorage.setItem('ymicp_token', authToken);
+                    currentUsername = result.data.username;
+                    showLoginOverlay(false);
+                    updateAuthUI();
+                    showToast('登录成功', 'success');
+                } else {
+                    errEl.textContent = result.message || '登录失败';
+                    errEl.style.display = 'block';
+                }
+            } catch (e) {
+                errEl.textContent = '登录出错：' + e.message;
+                errEl.style.display = 'block';
+            }
+        }
+
+        async function doLogout() {
+            try {
+                await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+            } catch (e) {}
+            authToken = '';
+            localStorage.removeItem('ymicp_token');
+            currentUsername = null;
+            updateAuthUI();
+            if (authEnabled) showLoginOverlay(true);
+            showToast('已退出登录', 'success');
+        }
+
         // HTTP请求封装
         async function httpRequest(method, url, data = null) {
             try {
                 showLoading(true);
                 const options = {
                     method: method,
+                    credentials: 'include',
                     headers: {
                         'Content-Type': 'application/json'
                     }
                 };
+                if (authToken) {
+                    options.headers['Authorization'] = 'Bearer ' + authToken;
+                }
 
                 if (data) {
                     options.body = JSON.stringify(data);
@@ -1309,6 +1527,13 @@
                 const result = await response.json();
 
                 showLoading(false);
+                if (response.status === 401 || result.code === 401) {
+                    authToken = '';
+                    localStorage.removeItem('ymicp_token');
+                    currentUsername = null;
+                    if (authEnabled) showLoginOverlay(true);
+                    updateAuthUI();
+                }
                 return result;
             } catch (error) {
                 showLoading(false);
@@ -2779,6 +3004,21 @@
                     document.getElementById('cfg-proxy-timeout').value = cfg.proxy.extra_api.proxy_timeout || 0.5;
                     document.getElementById('cfg-check-proxy-num').value = cfg.proxy.extra_api.check_proxy_num || 20;
 
+                    // 认证 / MCP
+                    const auth = cfg.auth || {};
+                    document.getElementById('cfg-auth-enable').checked = !!auth.enable;
+                    document.getElementById('cfg-auth-session-hours').value = auth.session_hours || 72;
+                    document.getElementById('cfg-auth-secret').value = auth.secret || 'change-me';
+                    const usersLines = (auth.users || []).map(u => {
+                        return (u.username || '') + (u.password_set ? ' ' : ' ');
+                    }).map(s => s.trimEnd());
+                    // 仅显示用户名，密码留空表示不修改
+                    document.getElementById('cfg-auth-users').value = (auth.users || [])
+                        .map(u => u.username || '').filter(Boolean).join('\n');
+                    const mcp = cfg.mcp || {};
+                    document.getElementById('cfg-mcp-enable').checked = !!mcp.enable;
+                    document.getElementById('cfg-mcp-port').value = mcp.port || 16182;
+
                     // 风险规避配置
                     const allowTypes = cfg.risk_avoidance?.allow_type || ["web", "app", "mapp", "kapp", "bweb", "bapp", "bmapp", "bkapp"];
                     document.querySelectorAll('.allow-type-checkbox').forEach(checkbox => {
@@ -2925,6 +3165,21 @@
                     },
                     history: {
                         save_query_history: document.getElementById('cfg-save-query-history').checked
+                    },
+                    auth: {
+                        enable: document.getElementById('cfg-auth-enable').checked,
+                        secret: document.getElementById('cfg-auth-secret').value || 'change-me',
+                        session_hours: parseInt(document.getElementById('cfg-auth-session-hours').value) || 72,
+                        users: document.getElementById('cfg-auth-users').value.split('\n')
+                            .map(line => line.trim()).filter(Boolean)
+                            .map(line => {
+                                const parts = line.split(/\s+/);
+                                return { username: parts[0], password: parts.slice(1).join(' ') || '' };
+                            })
+                    },
+                    mcp: {
+                        enable: document.getElementById('cfg-mcp-enable').checked,
+                        port: parseInt(document.getElementById('cfg-mcp-port').value) || 16182
                     }
                 };
 
@@ -2948,7 +3203,16 @@
         }
 
         // 页面加载完成后初始化
-        document.addEventListener('DOMContentLoaded', function () {
+        document.addEventListener('DOMContentLoaded', async function () {
+            document.getElementById('login-password').addEventListener('keypress', function (e) {
+                if (e.key === 'Enter') doLogin();
+            });
+            document.getElementById('login-username').addEventListener('keypress', function (e) {
+                if (e.key === 'Enter') doLogin();
+            });
+
+            await checkAuthStatus();
+
             // 绑定回车键查询
             document.getElementById('query-keyword').addEventListener('keypress', function (e) {
                 if (e.key === 'Enter') {

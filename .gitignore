@@ -13,6 +13,9 @@ wheels/
 *.build
 *.dist
 logs/
+src/rust/target/
+src/rust/*.db
+build/
 
 # vscode settings
 .vscode/
