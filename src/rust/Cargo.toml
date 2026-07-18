@@ -1,6 +1,6 @@
 [package]
 name = "ymicp"
-version = "0.7.0"
+version = "0.7.1"
 edition = "2021"
 description = "ICP备案查询系统 - Rust 重写版"
 authors = ["ymicp"]
