@@ -239,4 +239,4 @@ asyncio.run(main("微信"))
 - [💬 交流群 1029212047](https://qm.qq.com/q/gHf7f0R3zy)
 ## ⭐ Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=HG-ha/ICP_Query&type=Date)](https://star-history.com/#HG-ha/ICP_Query&Date)
+[![Star History Chart](https://star-history.dera.page/svg?repos=HG-ha/ICP_Query&type=Date)](https://star-history.dera.page/#HG-ha/ICP_Query&Date)
