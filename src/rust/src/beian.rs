@@ -260,6 +260,12 @@ impl Beian {
         Ok((token, headers))
     }
 
+    fn invalidate_token(&self) {
+        let mut cache = self.token.lock();
+        cache.token.clear();
+        cache.expire_ms = 0;
+    }
+
     fn get_client_uid() -> String {
         let chars: Vec<char> = "0123456789abcdef".chars().collect();
         let mut rng = rand::thread_rng();
@@ -294,13 +300,21 @@ impl Beian {
             .await
             .map_err(|e| format!("请求验证码时失败：{e}"))?;
 
-        let res: Value =
-            serde_json::from_str(&text).map_err(|e| format!("请求验证码时失败：{e}"))?;
+        let res: Value = match serde_json::from_str::<Value>(&text) {
+            Ok(v) if v["params"]["uuid"].is_string() => v,
+            Ok(_) => {
+                // token 被服务端提前作废时返回 code=401，丢弃缓存以便下次重新获取
+                self.invalidate_token();
+                let snippet: String = text.chars().take(200).collect();
+                return Err(format!("请求验证码时失败：{snippet}"));
+            }
+            Err(e) => {
+                self.invalidate_token();
+                return Err(format!("请求验证码时失败：{e}"));
+            }
+        };
 
-        let p_uuid = res["params"]["uuid"]
-            .as_str()
-            .ok_or("验证码响应缺少 uuid")?
-            .to_string();
+        let p_uuid = res["params"]["uuid"].as_str().unwrap_or_default().to_string();
         let big_image = res["params"]["bigImage"]
             .as_str()
             .ok_or("验证码响应缺少 bigImage")?
