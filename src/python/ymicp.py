@@ -389,6 +389,10 @@ class beian:
         logger.info(f"缺口定位：x={offset_x}, 滑块={sw}x{sh}")
         return True, offset_x
 
+    def _invalidate_token(self):
+        self.token = ""
+        self.token_expire = 0
+
     async def check_img(self, proxy=""):
         success, token, base_header = await self.get_token(proxy)
         if not success:
@@ -402,14 +406,24 @@ class beian:
             try:
                 async with self.get_session(proxy) as session:
                     async with session.post(self.getCheckImage, data=data, headers=base_header, proxy=proxy if proxy else None) as req:
-                        res = await req.json()
+                        # 服务端响应无 Content-Type，不能用 req.json()
+                        res_text = await req.text()
+                res = ujson.loads(res_text)
             except Exception as e:
+                self._invalidate_token()
                 logger.info(f"请求验证码时失败：{e}")
                 return False, f"请求验证码时失败：{e}", '', '', ''
 
-            p_uuid = res["params"]["uuid"]
-            big_image = res["params"]["bigImage"]
-            small_image = res["params"]["smallImage"]
+            params = res.get("params") if isinstance(res, dict) else None
+            if not isinstance(params, dict) or "uuid" not in params:
+                # token 被服务端提前作废时返回 code=401，丢弃缓存以便下次重新获取
+                self._invalidate_token()
+                logger.info(f"请求验证码时失败：{res_text[:200]}")
+                return False, f"请求验证码时失败：{res_text[:200]}", '', '', ''
+
+            p_uuid = params["uuid"]
+            big_image = params["bigImage"]
+            small_image = params["smallImage"]
 
             start = time.time()
             match_success, offset_x = self.match_slider_offset(small_image, big_image)
